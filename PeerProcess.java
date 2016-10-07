@@ -2,7 +2,7 @@
 
 Peer Process Class
 Handles Main Logical Course of Program
-Inputs: 4-digit PeerId
+Arguments: 4-digit PeerId
 
 **************************************/
 
@@ -28,12 +28,13 @@ public class PeerProcess {
 	static int[] portNumbers;
 	static boolean[] hasFile;
 
-	public static void main (String[] args) {
+	public static void main(String[] args) {
 
 		readPeerId(args);
 		readCommonCfg();
 		readPeerCfg();
-		checkFields(); //testing only
+		//checkFields(); //testing only\\
+		//TODO: Build TCP connection
 	}
 
 	public static void readPeerId(String[] args) {
