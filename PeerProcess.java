@@ -30,10 +30,16 @@ public class PeerProcess {
 
 	public static void main(String[] args) {
 
+		//Check for peerId input
 		readPeerId(args);
+		//Check for/consome common config file
 		readCommonCfg();
+		//Check for/consome peer config file
 		readPeerCfg();
-		//checkFields(); //testing only\\
+		//Create directories for peer processes
+		createPeerDirs();
+		//Set up for local logging (this process)
+		//prepareLogging();
 		//TODO: Build TCP connection
 	}
 
@@ -137,6 +143,17 @@ public class PeerProcess {
 		for (int i = 0; i < 6; i++) {
 			System.out.println(peerIds[i] + " " + hostNames[i] + 
 				" " + portNumbers[i] + " " + (hasFile[i] ? 1 : 0));
+		}
+	}
+
+	public static void createPeerDirs() {
+		String workingDir = System.getProperty("user.dir");
+		File file;
+		for (int peerId : peerIds) {
+			file = new File (workingDir + "\\" + "peer_" + peerId);
+			if (!file.isDirectory()) {
+				file.mkdir();
+			}
 		}
 	}
 }
