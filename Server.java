@@ -15,7 +15,7 @@ public class Server {
     private static class ServerThread extends Thread {
 
     	public void run() {
-	    	System.out.println("The server is running.");
+	    	System.out.println("The server is running." + '\n');
 	        int clientNum = 1;
 	        ServerSocket listener = null;
 	        try {

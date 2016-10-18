@@ -32,21 +32,27 @@ public class PeerProcess {
 
 		//Check for peerId input
 		readPeerId(args);
+		
 		//Check for/consome common config file
 		readCommonCfg();
+		
 		//Check for/consome peer config file
 		readPeerCfg();
+		
 		//Create directories for peer processes
 		createPeerDirs();
+		
 		//Set up for local logging (this process)
 		//prepareLogging();
-
-
+		
+		//Print input fields (for debugging)
+		//checkFields();
+		
+		//Initialize server
 		Server server = new Server();
-		System.out.println("s");
-		Client client = new Client();
-		System.out.println("c");
-		//TODO: Build TCP connection
+		
+		//Initialize client
+		Client client = new Client(peerId, peerIds, hostNames, portNumbers, hasFile);
 	}
 
 	public static void readPeerId(String[] args) {
@@ -135,8 +141,9 @@ public class PeerProcess {
 	}
 
 	public static void checkFields() {
+		System.out.print("Peer Id:");
 		System.out.println(peerId);
-
+		System.out.println("Common Fields:");
 		//Common fields
 		System.out.println(numberOfPreferredNeighbors); 
 		System.out.println(unchokingInterval);
@@ -145,6 +152,7 @@ public class PeerProcess {
 		System.out.println(fileSize);
 		System.out.println(pieceSize);
 
+		System.out.println("Peer Fields:");
 		//Peer fields 
 		for (int i = 0; i < 6; i++) {
 			System.out.println(peerIds[i] + " " + hostNames[i] + 
