@@ -12,7 +12,19 @@ public class Client {
     String message;                //message send to the server
     String MESSAGE;                //capitalized message read from the server
 
-    public void Client() {}
+    static int[] peerIds;
+    static String[] hostNames;
+    static int[] portNumbers;
+    static boolean[] hasFile;
+
+    public Client(int[] peerIds, String[] hostNames, 
+        int[] portNumbers, boolean[] hasFile) {
+        this.peerIds = peerIds;
+        this.hostNames = hostNames;
+        this.portNumbers = portNumbers;
+        this.hasFile = hasFile;
+        run();
+    }
 
     void run()
     {
@@ -92,11 +104,4 @@ public class Client {
             ioException.printStackTrace();
         }
     }
-    //main method
-    public static void main(String args[])
-    {
-        Client client = new Client();
-        client.run();
-    }
-
 }

@@ -8,20 +8,34 @@ public class Server {
 
     private static final int sPort = 8000;   //The server will be listening on this port number
 
-    public static void main(String[] args) throws Exception {
-        System.out.println("The server is running.");
-        ServerSocket listener = new ServerSocket(sPort);
-        int clientNum = 1;
-        try {
-            while(true) {
-                new Handler(listener.accept(),clientNum).start();
-                System.out.println("Client "  + clientNum + " is connected!");
-                clientNum++;
-            }
-        } finally {
-            listener.close();
-        }
+    public Server() {
+    	new ServerThread().start();
+    }
 
+    private static class ServerThread extends Thread {
+
+    	public void run() {
+	    	System.out.println("The server is running.");
+	        int clientNum = 1;
+	        ServerSocket listener = null;
+	        try {
+		    	try {
+		        	listener = new ServerSocket(sPort);
+		        	while(true) {
+		                new Handler(listener.accept(),clientNum).start();
+		                System.out.println("Client "  + clientNum + " is connected!");
+		                clientNum++;
+		            }
+		        } catch (Exception e) {
+		        	e.printStackTrace();
+		        }
+		         finally {
+		            listener.close();
+		        }
+		    } catch (IOException e) {
+		    	e.printStackTrace();
+		    }
+    	}
     }
 
     /**

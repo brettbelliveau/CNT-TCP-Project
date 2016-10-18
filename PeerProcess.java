@@ -40,6 +40,12 @@ public class PeerProcess {
 		createPeerDirs();
 		//Set up for local logging (this process)
 		//prepareLogging();
+
+
+		Server server = new Server();
+		System.out.println("s");
+		Client client = new Client();
+		System.out.println("c");
 		//TODO: Build TCP connection
 	}
 
