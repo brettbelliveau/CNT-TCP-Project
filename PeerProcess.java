@@ -49,7 +49,7 @@ public class PeerProcess {
 		//checkFields();
 		
 		//Initialize server
-		Server server = new Server();
+		Server server = new Server(peerId, peerIds, hostNames, portNumbers, hasFile);
 		
 		//Initialize client
 		Client client = new Client(peerId, peerIds, hostNames, portNumbers, hasFile);

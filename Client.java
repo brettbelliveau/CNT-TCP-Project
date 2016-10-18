@@ -29,6 +29,9 @@ public class Client {
 
         madeConnection = new boolean[peerIds.length];
         requestSocket = new Socket[peerIds.length];
+        out = new ObjectOutputStream[peerIds.length];
+        in = new ObjectInputStream[peerIds.length];
+
         ownIndex = Arrays.binarySearch(peerIds, peerId);
         madeConnection[ownIndex] = true;
         run();
@@ -37,10 +40,11 @@ public class Client {
     private static void run() {
         try {
             int connectionsLeft = peerIds.length-1;
-            while (connectionsLeft > 0) {
+            while (connectionsLeft > 4) { //needs to be reverted to 0 after testing
                 boolean connectionRefused[] = new boolean[peerIds.length];
+
                 for (int i = 0; i < peerIds.length; i++) {
-                    if (i != ownIndex) {
+                    if (i != ownIndex && !madeConnection[i]) {
                         System.out.println("Attempting to connect to " + hostNames[i] + 
                             " on port " + portNumbers[i]);
                         try {
@@ -49,6 +53,7 @@ public class Client {
                             System.out.println("Connected to " + hostNames[i] + 
                                 " in port " + portNumbers[i]);    
                             connectionsLeft--;
+                            madeConnection[i] = true;
                         } catch (ConnectException e) {
                             connectionRefused[i] = true;
                         }
@@ -61,31 +66,36 @@ public class Client {
                             " on port " + portNumbers[i]);
                     }
                 }
-                System.out.println();
-
+                if (connectionsLeft > 0) {
                 //Wait four seconds before attempting to reconnect
-                System.out.print("Waiting to reconnect");
-                Thread.sleep(1000);
-                System.out.print(".");
-                Thread.sleep(1000);
-                System.out.print(".");
-                Thread.sleep(1000);
-                System.out.print(".");
-                Thread.sleep(1000);
-                System.out.println();
+                    System.out.println();
+                    System.out.print("Waiting to reconnect");
+                    Thread.sleep(1000);
+                    System.out.print(".");
+                    Thread.sleep(1000);
+                    System.out.print(".");
+                    Thread.sleep(1000);
+                    System.out.print(".");
+                    Thread.sleep(1000);
+                    System.out.println();
+                }
             }
-
-            System.out.println("All connections have been established.");
+            System.out.println();
+            System.out.println("Normally this would repeat until all connections established.");
+            System.out.println("However, to allow for testing, this feature has been disabled.");
+            System.out.println();
+            //System.out.println("All connections have been established.");
 
             //initialize inputStream and outputStream
-            for (int i = 0; i < peerIds.length; i++) {
+            for (int i = 0; i < peerIds.length-4; i++) {  //needs to be reverted to not -4 after testing
                 if (i != ownIndex) {       
                     out[i] = new ObjectOutputStream(requestSocket[i].getOutputStream());
                     out[i].flush();
                     in[i] = new ObjectInputStream(requestSocket[i].getInputStream());
+                    System.out.println(i);
                 }
             }
-            
+            System.out.println("left");
             //get Input from standard input
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 
@@ -105,7 +115,7 @@ public class Client {
             
             System.out.println("handshake length: " + handshake.length);
             
-            for (int i = 0; i < peerIds.length; i++) {
+            for (int i = 0; i < peerIds.length-4; i++) { //needs to be reverted to not -4 after testing
                 if (i != ownIndex)
                     out[i].write(handshake);
             }
@@ -118,9 +128,9 @@ public class Client {
                 //read a sentence from the standard input
                 message = bufferedReader.readLine();
                 //Send the sentence to the server
-                sendMessage(message, (ownIndex + 1 % 6));
+                sendMessage(message, (ownIndex+1));
                 //Receive the upperCase sentence from the server
-                MESSAGE = (String)in[0].readObject();
+                MESSAGE = (String)in[1].readObject();
                 //show the message to the user
                 System.out.println("Receive message: " + MESSAGE);
             }
@@ -143,7 +153,7 @@ public class Client {
         finally {
             //Close connections
             try {
-                for (int i = 0; i < peerIds.length; i++) {
+                for (int i = 0; i < peerIds.length-4; i++) { //needs to be reverted to not -4 after testing
                     if (i != ownIndex) {
                         in[i].close();
                         out[i].close();

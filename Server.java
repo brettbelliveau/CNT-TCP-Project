@@ -6,9 +6,24 @@ import java.util.*;
 
 public class Server {
 
-    private static final int sPort = 8000;   //The server will be listening on this port number
+    private static int sPort;   //The server will be listening on this port number
 
-    public Server() {
+    static int peerId;
+    static int ownIndex;
+    static int[] peerIds;
+    static String[] hostNames;
+    static int[] portNumbers;
+    static boolean[] hasFile;
+
+    public Server(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile) {
+        this.peerId = peerId;
+        this.peerIds = peerIds;
+        this.hostNames = hostNames;
+        this.portNumbers = portNumbers;
+        this.hasFile = hasFile;
+
+        ownIndex = Arrays.binarySearch(peerIds, peerId);
+        sPort = portNumbers[ownIndex + 1];                //After testing, revert to not +1
     	new ServerThread().start();
     }
 
@@ -19,20 +34,20 @@ public class Server {
 	        int clientNum = 1;
 	        ServerSocket listener = null;
 	        try {
-		    	try {
-		        	listener = new ServerSocket(sPort);
-		        	while(true) {
+        		while(true) {
+			    	try {
+			        	listener = new ServerSocket(sPort);
 		                new Handler(listener.accept(),clientNum).start();
 		                System.out.println("Client "  + clientNum + " is connected!");
 		                clientNum++;
-		            }
-		        } catch (Exception e) {
-		        	e.printStackTrace();
-		        }
-		         finally {
-		            listener.close();
-		        }
-		    } catch (IOException e) {
+			        } catch (SocketException e) {
+			        	Thread.sleep(50);
+			        }
+			         finally {
+			            listener.close();
+			        }
+			    }
+		    } catch (Exception e) {
 		    	e.printStackTrace();
 		    }
     	}
