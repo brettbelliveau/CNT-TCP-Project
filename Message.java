@@ -63,7 +63,7 @@ public class Message {
 
 	public String toString() {
 		String str = "Length: " + length + 
-		", Type = " + type + ", Payload:" + payload;
+		", Type = " + (int)type + ", Payload:" + Arrays.toString(payload);
 		return str;
 	}
 
