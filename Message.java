@@ -8,6 +8,7 @@ Inputs: Message String
 
 import java.util.*;
 import java.lang.*;
+import java.nio.*;
 
 public class Message {
 
@@ -21,19 +22,38 @@ public class Message {
 	public static final int piece = 7;
 
 	public static int length;
-	public static int type;
-	public static String payload;
+	public static byte type;
+	public byte[] lengthB;
+	public byte[] payload;
 
-	public Message(String line) {
-		Scanner sc = new Scanner(line);
-		
-		length = Integer.parseInt(sc.next(), 2);
-		type = Integer.parseInt(sc.next(), 2);
-		
-		if (hasPayload(type))
-			payload = sc.next();
-		else
-			payload = "";
+	public Message(){}
+
+	public Message(int length, byte type, byte[] payload) {
+		this.length = length;
+		this.lengthB = ByteBuffer.allocate(4).putInt(length).array();
+		this.type = type;
+
+		if (hasPayload((int)type)) {
+			this.payload = new byte[length];
+			this.payload = payload;
+		}
+		else {
+			this.payload = null;
+		}
+
+	}
+
+	public Message(int length, byte[] data) {
+		this.length = length;
+		this.type = data[0];
+
+		if(hasPayload((int)type)) {
+			payload = new byte[length];
+			System.arraycopy(data, 1, payload, 0, length);
+		}
+		else {
+		    payload = null;
+		}
 	}
 
 	public boolean hasPayload(int type) {
@@ -45,6 +65,19 @@ public class Message {
 		String str = "Length: " + length + 
 		", Type = " + type + ", Payload:" + payload;
 		return str;
+	}
+
+	public byte[] getMessageBytes() {
+		ByteBuffer messageBuffer = ByteBuffer.allocate(5 + length);
+
+		messageBuffer.put(lengthB);
+		messageBuffer.put(type);
+
+		if(hasPayload((int)type)) {
+			messageBuffer.put(payload);
+		}
+
+		return messageBuffer.array();
 	}
 
 }

@@ -92,9 +92,12 @@ public class Server {
                     String header = new String(headerBytes);
                     int peerId = ByteBuffer.wrap(peeridBytes).getInt();
 
-                    System.out.println("Header: " + header);
-                    System.out.println("Zero bits: " + zeroBits.toString());
-                    System.out.println("Peer id: " + peerId);
+                    byte[] bitfieldLength = new byte[4];
+                    in.readFully(bitfieldLength);
+                    byte[] bitfieldData = new byte[ByteBuffer.wrap(bitfieldLength).getInt()+1];
+                    in.readFully(bitfieldData);
+                    Message bitfieldMsg = new Message(ByteBuffer.wrap(bitfieldLength).getInt(),bitfieldData);
+                    System.out.println("Bitfield received: " + bitfieldMsg.toString());
 
 
                     while(true)

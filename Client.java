@@ -5,6 +5,7 @@ import java.nio.channels.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+
 public class Client {
     static Socket requestSocket[];           //socket connect to the server
     static ObjectOutputStream out[];         //stream write to the socket
@@ -99,6 +100,7 @@ public class Client {
             //get Input from standard input
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 
+            //create handshake message and send it to peers
             byte[] handshakeHeader = new byte[18];
             handshakeHeader = "P2PFILESHARINGPROJ".getBytes("UTF-8");
             
@@ -112,15 +114,23 @@ public class Client {
             handshakeBuffer.put(peeridArray);
             
             byte[] handshake = handshakeBuffer.array();
-            
-            System.out.println("handshake length: " + handshake.length);
-            
+
+            //create bitfield message and send it to peers
+            byte[] bitfieldPayload = {(byte)1,(byte)6};
+            Message bitfield = new Message(2,(byte)5, bitfieldPayload);
+            System.out.println(bitfield.toString());
+
             for (int i = 0; i < peerIds.length-4; i++) { //needs to be reverted to not -4 after testing
-                if (i != ownIndex)
+                if (i != ownIndex) {
                     out[i].write(handshake);
+                    out[i].write(bitfield.getMessageBytes());
+                }
             }
             
             handshakeBuffer.clear();
+
+
+
 
             while(true)
             {
