@@ -20,13 +20,20 @@ public class Message {
 	public static final int bitfield = 5;
 	public static final int request = 6;
 	public static final int piece = 7;
+	public static final int handshake = 8;
 
-	public static int length;
-	public static byte type;
+	public int length;
+	public int clientID = -1;//-1 means that this value has not been set
+	public byte type;
 	public byte[] lengthB;
 	public byte[] payload;
 
 	public Message(){}
+
+	public Message(int length, byte type, byte[] payload, int clientID) { 
+		this(length, type, payload);
+		this.clientID = clientID;
+	}
 
 	public Message(int length, byte type, byte[] payload) {
 		this.length = length;

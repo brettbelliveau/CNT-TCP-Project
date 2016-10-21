@@ -25,7 +25,9 @@ public class Client {
     static boolean[] hasHandshakeSent;
     static boolean[] hasBitfieldSent;
 
-    static ServerListener[] listeners;
+    static int[] clientIDToPeerID; // Holds the conversion for converting a client ID to peer ids
+
+    static ServerListener serverListener;
 
     public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile) {
         this.peerId = peerId;
@@ -41,11 +43,16 @@ public class Client {
         hasHandshakeSent = new boolean[peerIds.length];
         hasBitfieldSent = new boolean[peerIds.length];
 
+        //init to -1 so we know which ones arent being used
+        clientIDToPeerID = new int[peerIds.length];
+        for (int i = 0; i < peerIds.length; i++) {
+            clientIDToPeerID[i] = -1;
+        }
+
+
         requestSocket = new Socket[peerIds.length];
         out = new ObjectOutputStream[peerIds.length];
         //in = new ObjectInputStream[peerIds.length];
-
-        listeners = new ServerListener[peerIds.length];
 
         ownIndex = Arrays.binarySearch(peerIds, peerId);
         madeConnection[ownIndex] = true;
@@ -54,14 +61,17 @@ public class Client {
 
     private static void run() {
         try {
-            while (true) {
-                //This checks for connections to the other clients
-                checkConnections();
+            //Starts our server listener which will create multiple sockets based on how many clients connect
+            serverListener = new ServerListener(peerIds[ownIndex], hostNames[ownIndex], portNumbers[ownIndex]);
 
-            System.out.println();
-            System.out.println("Normally this would repeat until all connections established.");
-            System.out.println("However, to allow for testing, this feature has been disabled.");
-            System.out.println();
+            
+            //This checks for connections to the other clients
+            initConnections();
+
+            //System.out.println();
+            //System.out.println("Normally this would repeat until all connections established.");
+            //System.out.println("However, to allow for testing, this feature has been disabled.");
+            //System.out.println();
             //System.out.println("All connections have been established.");
 
             //initialize outputStreams
@@ -69,17 +79,14 @@ public class Client {
                 if (i != ownIndex && madeConnection[i]) {       
                     out[i] = new ObjectOutputStream(requestSocket[i].getOutputStream());
                     out[i].flush();
-                    //in[i] = new ObjectInputStream(requestSocket[i].getInputStream());
                     System.out.println(i);
                 }
             }
+            //Main loop that checks if we need to send or receive messages
+            while (true) {
 
-
-            
-
-            
-
-            for (int i = 0; i < peerIds.length; i++) { //Check to see if we have sent messages to connected clients:
+            //This is where we check to see if we need to send any messages:
+            for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex) {
                     //if we havent sent the bitfield and we are connected:
                     if (!hasHandshakeSent[i] && madeConnection[i]) {
@@ -98,46 +105,54 @@ public class Client {
                 }
             }
 
-            //Now check if we have received messages from any clients:
-            for (int i = 0; i < peerIds.length; i++) {
-                if (i != ownIndex) {
-                    synchronized (listeners[i].receivedMessages) {
-                        //loop thru all of the received messages
-                        for (int j = 0; j < listeners[i].receivedMessages.size(); j++) {
-                            Message incomingMessage = (Message)listeners[i].receivedMessages.get(j);
-                            if (incomingMessage.type == (byte)5) {
-                                //it is a bitfield:
-                                hasBitfieldReceived[i] = true;
-                                System.out.println("Received bitfield from host " + hostNames[i] + " on port " + portNumbers[i]);
-                            } else {
-                                //it is a handshake:
-                                hasHandshakeReceived[i] = true;
-                                System.out.println("Received handshake from host " + hostNames[i] + " on port " + portNumbers[i]);
-                            }
-                            listeners[i].receivedMessages.remove(j);
-                        }
+            //Now check if we have received messages from any clients (Synchronized, thread safe):
+            synchronized (serverListener.receivedMessages) {
+                //loop thru all of the received messages
+                for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
+                   Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
+                   //Using a switch statement base on which type this message is:
+                   switch (incomingMessage.type) {
+                    case (byte)Message.handshake:
+                    {
+                            //it is a handshake:
+                        //Length holds the peer ID in a handshake message:
+                        clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
+                        int localIndex = getLocalIndex(incomingMessage.clientID);
+                        //We have received the handshake lets set it and print it out
+                        hasHandshakeReceived[localIndex] = true;
+                        System.out.println("Received handshake from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
+                        break;
                     }
+                    /*
+                     * Here is the case in which we receive a bitfield:
+                     */
+                    case (byte)Message.bitfield:
+                    {
+                        //it is a bitfield:
+                        //Get the local index
+                        int localIndex = getLocalIndex(incomingMessage.clientID);
+
+                        if (localIndex == -1) {
+                            //We haven't received the handshake yet so skip to next iteration:
+                            continue;
+                        }
+                        hasBitfieldReceived[localIndex] = true;
+                        System.out.println("Received bitfield from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
+                        break;
+                    }
+
+                    //Default statement to catch errors:
+                    default:
+                    System.out.println("Error unknown type.");
+                    break;
                 }
-            }
-            
-
-
-
-
-            //while(true)
-            //{
-                //System.out.print("Hello, please input a sentence: ");
-                //read a sentence from the standard input
-                //message = bufferedReader.readLine();
-                //Send the sentence to the server
-                //sendMessage(message, (ownIndex+1));
-                //Receive the upperCase sentence from the server
-                //MESSAGE = (String)in[1].readObject();
-                //show the message to the user
-                //System.out.println("Receive message: " + MESSAGE);
-            //}
+                //After we have parsed this message we are done with it, remove it:
+                serverListener.receivedMessages.remove(j);
             }
         }
+
+    }
+}
         catch (ConnectException e) {
             System.err.println("Connection refused. You need to initiate a server first.");
         }
@@ -168,6 +183,18 @@ public class Client {
             }
         }
     }
+    private static int getLocalIndex(int clientID) {
+        //Find the index related to the peer ID given and put it in localIndex
+        for (int i = 0; i < peerIds.length; i++) {
+            if (peerIds[i] == clientIDToPeerID[clientID]) {
+                //return the index if it matchs
+                return i;
+            }
+        }
+        //return -1 if not found:
+        return -1;
+    }
+
     private static void sendHandshake(int index) {
         //create handshake message and send it to peers
             byte[] handshakeHeader = new byte[18];
@@ -197,12 +224,12 @@ public class Client {
         //create bitfield message and send it to peers
         byte[] bitfieldPayload = {(byte)1,(byte)6};
         Message bitfield = new Message(2,(byte)5, bitfieldPayload);
-        System.out.println(bitfield.toString());
+        //System.out.println("sending bitfield: " + bitfield.toString());
 
         sendMessage(bitfield.getMessageBytes(), index);
     }
 
-    private static void checkConnections() {
+    private static void initConnections() {
         int connectionsLeft = peerIds.length-1;
             while (connectionsLeft > 4) { //needs to be reverted to 0 after testing
                 boolean connectionRefused[] = new boolean[peerIds.length];
@@ -218,8 +245,6 @@ public class Client {
                             if (requestSocket[i].isConnected()) {
                             System.out.println("Connected to " + hostNames[i] + 
                                 " in port " + portNumbers[i]); 
-                            //Setup listener for the other peer
-                            listeners[i] = new ServerListener(peerIds[i], hostNames[i], portNumbers[i]);
                             connectionsLeft--;
                             madeConnection[i] = true;
                             }
@@ -242,12 +267,7 @@ public class Client {
                     try {
                     System.out.println();
                     System.out.print("Waiting to reconnect");
-                    Thread.sleep(1000);
-                    System.out.print(".");
-                    Thread.sleep(1000);
-                    System.out.print(".");
-                    Thread.sleep(1000);
-                    System.out.print(".");
+                    System.out.println("...");
                     Thread.sleep(1000);
                     System.out.println();
                     } catch (Exception e) {
@@ -258,7 +278,7 @@ public class Client {
     }
 
     //send a message to the output stream
-    private static void sendMessage(Object msg, int socketIndex)
+    private static void sendMessage(byte[] msg, int socketIndex)
     {
         try{
             //stream write the message

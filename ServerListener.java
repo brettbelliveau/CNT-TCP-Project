@@ -2,6 +2,7 @@ import java.net.*;
 import java.io.*;
 import java.nio.*;
 import java.nio.channels.*;
+import java.nio.charset.Charset;
 import java.util.*;
 
 public class ServerListener {
@@ -34,73 +35,108 @@ public class ServerListener {
     private class ListenerThread extends Thread {
 
     	public void run() {
-	    	//System.out.println("The server is starting." + '\n');
-
+            System.out.println("The server is running waiting for connections." + '\n');
+            int clientNum = 0;
+            ServerSocket listener = null;
             try {
-                listener = new ServerSocket(portNumber);
-
-                try{
-                    //initialize Input and Output streams
-                    in = new ObjectInputStream(connection.getInputStream());
-
-                    try{
-                        //Endless loop that receives messages
-                        while(true)
-                        {
-                            //receive the message sent from the client
-                            message = convertToMessage((byte[])in.readObject());
-                            //Add the message to our list:
-                            synchronized (receivedMessages) {
-                                receivedMessages.add(message);
-                            }
-                            //shosw the message to the user
-                            System.out.println("Received message: " + message.type + " from client.");
-                        }
+                while(true) {
+                    try {
+                        listener = new ServerSocket(portNumber);
+                        new Handler(listener.accept(),clientNum).start();
+                        System.out.println("Client "  + clientNum + " is connected!");
+                        clientNum++;
+                    } catch (SocketException e) {
+                        Thread.sleep(50);
                     }
-                    //Catch unknown data types
-                    catch(ClassNotFoundException classnot){
-                        connected = false;
-                        System.err.println("Data received in unknown format");
+                    finally {
+                        listener.close();
                     }
                 }
-                //
-                catch(IOException ioException){
-                    connected = false;
-                    //System.out.println("Disconnect with Client " + no);
-                }
-                finally{
-                    //Close connections
-                    try{
-                        in.close();
-                        connection.close();
-                        connected = false;
-                    }
-                    catch(IOException ioException){
-                        connected = false;
-                        //System.out.println("Disconnect with Client " + no);
-                    }
-                }
-
-                //System.out.println("Client "  + clientNum + " is connected!");
-            } catch (SocketException e) {
-                connected = false;
-                System.out.println(e.getStackTrace());
-            } catch (IOException e ) {
-
-            }
-            finally {
-                try {
-                listener.close();
-                } catch (Exception e) {
-
-                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
 
-    private Message convertToMessage(byte[] data) {
-        int length = ByteBuffer.wrap(Arrays.copyOfRange(data, 0, 3)).getInt();
-        byte[] payload = Arrays.copyOfRange(data, 4, data.length);
-        return new Message(length, data[5], payload);
+    private Message convertToMessage(byte[] data, int clientID) {
+        //Check for handshake:
+        if (data.length >= 18) {
+            byte[] bytes = Arrays.copyOfRange(data, 0, 18);
+            String header = new String(bytes, Charset.forName("UTF-8"));
+            //System.out.println("header: " + header);
+            if (header.equalsIgnoreCase("P2PFILESHARINGPROJ")) {
+                //System.out.println("Found handshake header");
+                int newPeerID = ByteBuffer.allocate(4).put(Arrays.copyOfRange(data, 28, 32)).getInt(0);
+                return new Message(newPeerID, (byte)Message.handshake, null, clientID);
+            }
+        }
+
+        //Converts the incoming bytes into the actual Message with its associated clientID
+        int length = ByteBuffer.allocate(4).put(Arrays.copyOfRange(data, 0, 4)).getInt(0);
+        byte[] payload = Arrays.copyOfRange(data, 5, data.length);
+        return new Message(length, data[4], payload, clientID);
     }
+
+     /**
+     * A handler thread class.  Handlers are spawned from the listening
+     * loop and are responsible for dealing with a single client's requests.
+     */
+     private class Handler extends Thread {
+        private Message message;    //message received from the client
+        private Socket connection;
+        private ObjectInputStream in;   //stream read from the socket
+        private int clientID;     //The index number of the client
+
+        public Handler(Socket connection, int clientID) {
+            this.connection = connection;
+            this.clientID = clientID;
+        }
+
+        public void run() {
+            try{
+                //initialize Input and Output streams
+                in = new ObjectInputStream(connection.getInputStream());
+
+                try{
+
+                    while(true)
+                    {
+                        //receive the message sent from the client
+                        byte[] temp = (byte[])in.readObject();
+                        /*for (int i = 0; i < temp.length; i++) {
+                            System.out.println(i + " : " + temp[i]);
+                        }*/
+                        message = convertToMessage(temp, clientID);
+                        //System.out.println("Placing message in array: " + message.toString());
+
+
+                        //Add the message to our list (Synchronized makes it thread safe):
+                        synchronized (receivedMessages) {
+                            receivedMessages.add(message);
+                        }
+                        //show the message to the user
+                        System.out.println("Received message: " + message.toString() + " from client " + clientID);
+                    }
+                }
+                catch(ClassNotFoundException classnot){
+                    System.err.println("Data received in unknown format");
+                }
+            }
+            catch(IOException ioException){
+                System.out.println("Disconnect with Client " + clientID);
+            }
+            finally{
+                //Close connections
+                try{
+                    in.close();
+                    connection.close();
+                }
+                catch(IOException ioException){
+                    System.out.println("Disconnect with Client " + clientID);
+                }
+            }
+        }
+
+    }
+
 }
