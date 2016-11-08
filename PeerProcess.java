@@ -42,15 +42,9 @@ public class PeerProcess {
 		//Create directories for peer processes
 		createPeerDirs();
 		
-		//Set up for local logging (this process)
-		//prepareLogging();
-		
 		//Print input fields (for debugging)
 		//checkFields();
-		
-		//Initialize server
-		//Server server = new Server(peerId, peerIds, hostNames, portNumbers, hasFile);
-		
+	
 		//Initialize client
 		Client client = new Client(peerId, peerIds, hostNames, portNumbers, hasFile);
 	}
@@ -120,7 +114,6 @@ public class PeerProcess {
 			while (reader.readLine() != null) {
  				peerCount++;
  			}
- 			System.out.println("count:" + peerCount);
  			reader.close();
  
  			reader = new BufferedReader(new FileReader(file));
