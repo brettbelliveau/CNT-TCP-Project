@@ -68,14 +68,10 @@ public class Client {
             //This checks for connections to the other clients
             initConnections();
 
-            //System.out.println();
-            //System.out.println("Normally this would repeat until all connections established.");
-            //System.out.println("However, to allow for testing, this feature has been disabled.");
-            //System.out.println();
-            //System.out.println("All connections have been established.");
+            System.out.println("All connections have been established.");
 
             //initialize outputStreams
-            for (int i = 0; i < peerIds.length; i++) {  //needs to be reverted to not -4 after testing
+            for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex && madeConnection[i]) {       
                     out[i] = new ObjectOutputStream(requestSocket[i].getOutputStream());
                     out[i].flush();
@@ -117,7 +113,7 @@ public class Client {
                             //it is a handshake:
                         //Length holds the peer ID in a handshake message:
                         clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
-                        int localIndex = getLocalIndex(incomingMessage.clientID);
+                        int localIndex =  ownIndex;
                         //We have received the handshake lets set it and print it out
                         hasHandshakeReceived[localIndex] = true;
                         System.out.println("Received handshake from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
@@ -130,7 +126,7 @@ public class Client {
                     {
                         //it is a bitfield:
                         //Get the local index
-                        int localIndex = getLocalIndex(incomingMessage.clientID);
+                        int localIndex = ownIndex;
 
                         if (localIndex == -1) {
                             //We haven't received the handshake yet so skip to next iteration:
@@ -171,7 +167,7 @@ public class Client {
         finally {
             //Close connections
             try {
-                for (int i = 0; i < peerIds.length-4; i++) { //needs to be reverted to not -4 after testing
+                for (int i = 0; i < peerIds.length; i++) {
                     if (i != ownIndex) {
                         out[i].close();
                         requestSocket[i].close();
@@ -182,17 +178,6 @@ public class Client {
                 ioException.printStackTrace();
             }
         }
-    }
-    private static int getLocalIndex(int clientID) {
-        //Find the index related to the peer ID given and put it in localIndex
-        for (int i = 0; i < peerIds.length; i++) {
-            if (peerIds[i] == clientIDToPeerID[clientID]) {
-                //return the index if it matchs
-                return i;
-            }
-        }
-        //return -1 if not found:
-        return -1;
     }
 
     private static void sendHandshake(int index) {
@@ -231,7 +216,7 @@ public class Client {
 
     private static void initConnections() {
         int connectionsLeft = peerIds.length-1;
-            while (connectionsLeft > 4) { //needs to be reverted to 0 after testing
+            while (connectionsLeft > 0) {
                 boolean connectionRefused[] = new boolean[peerIds.length];
 
                 for (int i = 0; i < peerIds.length; i++) {

@@ -114,14 +114,22 @@ public class PeerProcess {
 		
 		try {
 			File file = new File("PeerInfo.cfg");
+			int peerCount = 0;
 			String line;
-			reader = new BufferedReader(new FileReader(file));
-			peerIds = new int[6];
-			hostNames = new String[6];
-			portNumbers = new int[6];
-			hasFile = new boolean[6];
+ 			reader = new BufferedReader(new FileReader(file));
+			while (reader.readLine() != null) {
+ 				peerCount++;
+ 			}
+ 			System.out.println("count:" + peerCount);
+ 			reader.close();
+ 
+ 			reader = new BufferedReader(new FileReader(file));
+ 			peerIds = new int[peerCount];
+ 			hostNames = new String[peerCount];
+ 			portNumbers = new int[peerCount];
+			hasFile = new boolean[peerCount];
 			
-			for (int i = 0; i < 6; i++) {
+			for (int i = 0; i < peerCount; i++) {
 				
 				if ((line = reader.readLine()) == null)
 					throw new Exception();

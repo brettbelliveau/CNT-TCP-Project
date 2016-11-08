@@ -7,7 +7,7 @@ import java.util.*;
 
 public class ServerListener {
 
-    public List receivedMessages; //Synchronized list of messages received which is thread safe
+    public List<Message> receivedMessages; //Synchronized list of messages received which is thread safe
 
     private int peerId;
     private String hostName;
