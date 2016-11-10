@@ -45,8 +45,12 @@ public class PeerProcess {
 		//Print input fields (for debugging)
 		//checkFields();
 	
+		if (Arrays.binarySearch(peerIds, peerId) < 0) {
+			System.out.println("Error, incorrect peerId");
+			return;
+		}
 		//Initialize client
-		Client client = new Client(peerId, peerIds, hostNames, portNumbers, hasFile);
+		Client client = new Client(peerId, peerIds, hostNames, portNumbers, hasFile, fileSize, pieceSize);
 	}
 
 	public static void readPeerId(String[] args) {
@@ -84,7 +88,7 @@ public class PeerProcess {
 				else if (line.contains("FileName "))
 					fileName = line.split("FileName ")[1];
 
-				else if (line.contains("FileSize "))
+				else if (line.contains("FileSize ")) 
 					fileSize = Integer.parseInt((
 						line.split("FileSize ")[1]));
 

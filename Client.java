@@ -5,6 +5,7 @@ import java.nio.channels.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.*;
+import java.math.BigInteger;
 
 
 public class Client {
@@ -16,6 +17,8 @@ public class Client {
 
     static int peerId;
     static int ownIndex;
+    static int fileSize;
+    static int pieceSize;
     static boolean[] madeConnection;
     static int[] peerIds;
     static String[] hostNames;
@@ -30,14 +33,46 @@ public class Client {
 
     static int[] clientIDToPeerID; // Holds the conversion for converting a client ID to peer ids
 
+    public static Neighbor[] neighbors;
+    public static byte[] bitfield;
+    public int numberOfBits;
+    public int numberOfBytes;
+
     static ServerListener serverListener;
 
-    public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile) {
+    public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile, int fileSize, int pieceSize) {
         this.peerId = peerId;
         this.peerIds = peerIds;
         this.hostNames = hostNames;
         this.portNumbers = portNumbers;
-        this.hasFile = hasFile; 
+        this.hasFile = hasFile;
+        this.fileSize = fileSize;
+        this.pieceSize = pieceSize;
+
+        ownIndex = Arrays.binarySearch(peerIds, peerId);
+        //Initialize bitmap to the file size divided by the piece size and then add one because we cast it to an int
+        //Which floors the value
+        numberOfBits = (int)(fileSize/pieceSize + 1);
+        numberOfBytes = (int)(numberOfBits/8 + 1);
+        bitfield = new byte[numberOfBytes];
+        //Set all of the bits to true if we have the file:
+        if (hasFile[ownIndex]) {
+            //To set all the bits we make an integer that has all the bits set, then turn it into a byte[]
+            BigInteger bigInt = new BigInteger("0");
+            for (int i = 0; i < numberOfBits; i++) {
+                bigInt = bigInt.setBit(i);
+                System.out.println(bigInt.toString());
+            }
+            byte[] array = bigInt.toByteArray();
+            //Here we handle the case where the sign carries over since BigInt is signed:
+            if (array[0] == 0) {
+                array = Arrays.copyOfRange(array, 1, array.length);
+            }
+            bitfield = array;
+        }
+
+        //Initialize our neighbor data:
+        neighbors = new Neighbor[peerIds.length];
 
         madeConnection = new boolean[peerIds.length];
 
@@ -57,7 +92,7 @@ public class Client {
         out = new ObjectOutputStream[peerIds.length];
         //in = new ObjectInputStream[peerIds.length];
 
-        ownIndex = Arrays.binarySearch(peerIds, peerId);
+        
         madeConnection[ownIndex] = true;
 
         //Set up for local logging (this process)
@@ -98,8 +133,8 @@ public class Client {
                         hasHandshakeSent[i] = true;
                         logger.info("Sent handshake to host " + hostNames[i] + " on port " + portNumbers[i]);
                     }
-                    //if we havent sent the bitfield and we are connected:
-                    if (!hasBitfieldSent[i] && madeConnection[i]) {
+                    //if we havent sent the bitfield and we are connected and we have received the handshake:
+                    if (!hasBitfieldSent[i] && madeConnection[i] && hasHandshakeReceived[i]) {
                         //Send the bitfield
                         sendBitfield(i);
                         hasBitfieldSent[i] = true;
@@ -113,14 +148,21 @@ public class Client {
                 //loop thru all of the received messages
                 for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
                    Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
+                    int localIndex = clientIDToPeerID[incomingMessage.clientID];
+
+
+                    if (localIndex == -1 && !(incomingMessage.type == (byte)Message.handshake)) {
+                        //We haven't received the handshake yet so skip to next iteration:
+                        continue;
+                    }
+
                    //Using a switch statement base on which type this message is:
                    switch (incomingMessage.type) {
                     case (byte)Message.handshake:
                     {
-                            //it is a handshake:
+                        //it is a handshake:
                         //Length holds the peer ID in a handshake message:
                         clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
-                        int localIndex =  ownIndex;
                         //We have received the handshake lets set it and print it out
                         hasHandshakeReceived[localIndex] = true;
                         logger.info("Received handshake from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
@@ -132,13 +174,7 @@ public class Client {
                     case (byte)Message.bitfield:
                     {
                         //it is a bitfield:
-                        //Get the local index
-                        int localIndex = ownIndex;
-
-                        if (localIndex == -1) {
-                            //We haven't received the handshake yet so skip to next iteration:
-                            continue;
-                        }
+                        neighbors[localIndex].bitmap = incomingMessage.payload;
                         hasBitfieldReceived[localIndex] = true;
                         logger.info("Received bitfield from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
                         break;
@@ -214,11 +250,10 @@ public class Client {
 
     private static void sendBitfield(int index) {
         //create bitfield message and send it to peers
-        byte[] bitfieldPayload = {(byte)1,(byte)6};
-        Message bitfield = new Message(2,(byte)5, bitfieldPayload);
+        Message bitfieldMessage = new Message(2,(byte)5, bitfield);
         //System.out.println("sending bitfield: " + bitfield.toString());
 
-        sendMessage(bitfield.getMessageBytes(), index);
+        sendMessage(bitfieldMessage.getMessageBytes(), index);
     }
 
     private static void initConnections() {
@@ -304,3 +339,5 @@ public class Client {
         }
     }
 }
+
+
