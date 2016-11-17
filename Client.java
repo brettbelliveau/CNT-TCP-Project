@@ -170,7 +170,10 @@ public class Client {
 
                         //Check to see if we need to send interested or uninterested to the sender
                         //As per project requirement
-                        if (neighbors[messageIndex].hasFile) {}
+                        if (checkIfNeedPieces(neighbors[messageIndex])) {
+                            //Send that we are interested
+                            sendInterested(messageIndex);
+                        }
 
                         logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
                         break;
@@ -246,10 +249,46 @@ public class Client {
 
     private static void sendBitfield(int index) {
         //create bitfield message and send it to peers
-        Message bitfieldMessage = new Message(2,(byte)5, bitfield);
+        Message bitfieldMessage = new Message(bitfield.length, (byte)Message.bitfield, bitfield);
         //System.out.println("sending bitfield: " + bitfield.toString());
 
         sendMessage(bitfieldMessage.getMessageBytes(), index);
+    }
+
+    private static void sendInterested(int index) {
+        //send an interested message to a given index
+        Message message = new Message(0,(byte)Message.interested, null);
+        //System.out.println("sending bitfield: " + bitfield.toString());
+        sendMessage(message.getMessageBytes(), index);
+    }
+
+    private static void sendNotInterested(int index) {
+        //send a not interested message to a given index
+        Message message = new Message(0,(byte)Message.not_interested, null);
+        //System.out.println("sending bitfield: " + bitfield.toString());
+        sendMessage(message.getMessageBytes(), index);
+    }
+
+    private static boolean checkIfNeedPieces(Neighbor neighbor) {
+        BigInteger incomingBitfieldInt = new BigInteger(neighbor.bitmap);
+        BigInteger selfBitfieldInt = new BigInteger(bitfield);
+
+        //Check the bits of the bitfield to see if the incoming bitfield has any bits that we don't
+        //Example:
+        //00000010 (own bitfield)
+        //00001111 (incoming bitfield)
+        //AND =
+        //00000010
+        //NOT = 
+        //11111101
+        //00001111 (Now we And it with the incoming bitfield again)
+        //AND =
+        //00001101 We should be left with the bits that we dont have
+        //If it is greater than 0 then we need pieces from the sender:
+        if (incomingBitfieldInt.and(selfBitfieldInt.and(incomingBitfieldInt).not()).doubleValue() > 0) {
+            return true;
+        }
+        return false;
     }
 
     private static void initConnections() {
