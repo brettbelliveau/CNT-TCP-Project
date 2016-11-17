@@ -19,15 +19,8 @@ public class Client {
     static int ownIndex;
     static int fileSize;
     static int pieceSize;
-    static boolean[] madeConnection;
+    //static boolean[] madeConnection;
     static int[] peerIds;
-    static String[] hostNames;
-    static int[] portNumbers;
-    static boolean[] hasFile;
-    static boolean[] hasHandshakeReceived;
-    static boolean[] hasBitfieldReceived;
-    static boolean[] hasHandshakeSent;
-    static boolean[] hasBitfieldSent;
     static Logger logger;
     static FileHandler fileHandler;
 
@@ -43,9 +36,6 @@ public class Client {
     public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile, int fileSize, int pieceSize) {
         this.peerId = peerId;
         this.peerIds = peerIds;
-        this.hostNames = hostNames;
-        this.portNumbers = portNumbers;
-        this.hasFile = hasFile;
         this.fileSize = fileSize;
         this.pieceSize = pieceSize;
 
@@ -55,6 +45,7 @@ public class Client {
         numberOfBits = (int)(fileSize/pieceSize + 1);
         numberOfBytes = (int)(numberOfBits/8 + 1);
         bitfield = new byte[numberOfBytes];
+
         //Set all of the bits to true if we have the file:
         if (hasFile[ownIndex]) {
             //To set all the bits we make an integer that has all the bits set, then turn it into a byte[]
@@ -73,18 +64,16 @@ public class Client {
 
         //Initialize our neighbor data:
         neighbors = new Neighbor[peerIds.length];
-
-        madeConnection = new boolean[peerIds.length];
-
-        hasHandshakeReceived = new boolean[peerIds.length];
-        hasBitfieldReceived = new boolean[peerIds.length];
-        hasHandshakeSent = new boolean[peerIds.length];
-        hasBitfieldSent = new boolean[peerIds.length];
-
-        //init to -1 so we know which ones arent being used
         clientIDToPeerID = new int[peerIds.length];
+
         for (int i = 0; i < peerIds.length; i++) {
+            //init to -1 so we know which ones arent being used
             clientIDToPeerID[i] = -1;
+            //Init neighbors
+            neighbors[i].peerId = peerIds[i];
+            neighbors[i].hostName = hostNames[i];
+            neighbors[i].portNumber = portNumbers[i];
+            neighbors[i].hasFile = hasFile[i];
         }
 
 
@@ -93,7 +82,7 @@ public class Client {
         //in = new ObjectInputStream[peerIds.length];
 
         
-        madeConnection[ownIndex] = true;
+        //madeConnection[ownIndex] = true;
 
         //Set up for local logging (this process)
         prepareLogging();
@@ -104,7 +93,7 @@ public class Client {
     private static void run() {
         try {
             //Starts our server listener which will create multiple sockets based on how many clients connect
-            serverListener = new ServerListener(peerIds[ownIndex], hostNames[ownIndex], portNumbers[ownIndex]);
+            serverListener = new ServerListener(peerIds[ownIndex], neighbors[ownIndex].hostName, neighbors[ownIndex].portNumber);
 
             
             //This checks for connections to the other clients
@@ -114,7 +103,7 @@ public class Client {
 
             //initialize outputStreams
             for (int i = 0; i < peerIds.length; i++) {
-                if (i != ownIndex && madeConnection[i]) {       
+                if (i != ownIndex && neighbors[i].madeConnection) {       
                     out[i] = new ObjectOutputStream(requestSocket[i].getOutputStream());
                     out[i].flush();
                     System.out.println(i);
@@ -127,18 +116,18 @@ public class Client {
             for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex) {
                     //if we havent sent the bitfield and we are connected:
-                    if (!hasHandshakeSent[i] && madeConnection[i]) {
+                    if (!neighbors[i].hasHandshakeSent && neighbors[i].madeConnection) {
                         //Send the bitfield
                         sendHandshake(i);
-                        hasHandshakeSent[i] = true;
-                        logger.info("Sent handshake to host " + hostNames[i] + " on port " + portNumbers[i]);
+                        neighbors[i].hasHandshakeSent = true;
+                        logger.info("Sent handshake to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber);
                     }
                     //if we havent sent the bitfield and we are connected and we have received the handshake:
-                    if (!hasBitfieldSent[i] && madeConnection[i] && hasHandshakeReceived[i]) {
+                    if (!neighbors[i].hasBitfieldSent && neighbors[i].madeConnection && neighbors[i].hasHandshakeReceived) {
                         //Send the bitfield
                         sendBitfield(i);
-                        hasBitfieldSent[i] = true;
-                        logger.info("Sent bitfield to host " + hostNames[i] + " on port " + portNumbers[i]);
+                        neighbors[i].hasBitfieldSent = true;
+                        logger.info("Sent bitfield to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber);
                     }
                 }
             }
@@ -164,8 +153,8 @@ public class Client {
                         //Length holds the peer ID in a handshake message:
                         clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
                         //We have received the handshake lets set it and print it out
-                        hasHandshakeReceived[localIndex] = true;
-                        logger.info("Received handshake from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
+                        neighbors[localIndex].hasHandshakeReceived = true;
+                        logger.info("Received handshake from host:" + neighbors[localIndex].hostName + " on port:" + neighbors[localIndex].portNumber);
                         break;
                     }
                     /*
@@ -175,8 +164,13 @@ public class Client {
                     {
                         //it is a bitfield:
                         neighbors[localIndex].bitmap = incomingMessage.payload;
-                        hasBitfieldReceived[localIndex] = true;
-                        logger.info("Received bitfield from host:" + hostNames[localIndex] + " on port:" + portNumbers[localIndex]);
+                        neighbors[localIndex].hasBitfieldReceived = true;
+
+                        //Check to see if we need to send interested or uninterested to the sender
+                        //As per project requirement
+                        if (neighbors[localIndex].hasFile) {}
+
+                        logger.info("Received bitfield from host:" + neighbors[localIndex].hostName + " on port:" + neighbors[localIndex].portNumber);
                         break;
                     }
 
@@ -260,34 +254,34 @@ public class Client {
         int connectionsLeft = peerIds.length-1;
             while (connectionsLeft > 0) {
                 System.out.println();
-                boolean connectionRefused[] = new boolean[peerIds.length];
 
                 for (int i = 0; i < peerIds.length; i++) {
-                    if (i != ownIndex && !madeConnection[i]) {
-                        logger.info("Attempting to connect to " + hostNames[i] + 
-                            " on port " + portNumbers[i]);
+                    if (i != ownIndex && !neighbors[i].madeConnection) {
+                        logger.info("Attempting to connect to " + neighbors[i].hostName + 
+                            " on port " + neighbors[i].portNumber);
                         try {
                             //create a socket to connect to the server
-                            requestSocket[i] = new Socket(hostNames[i], portNumbers[i]);
+                            requestSocket[i] = new Socket(neighbors[i].hostName, neighbors[i].portNumber);
 
                             if (requestSocket[i].isConnected()) {
-                            logger.info("Connected to " + hostNames[i] + 
-                                " in port " + portNumbers[i]); 
+                            logger.info("Connected to " + neighbors[i].hostName + 
+                                " in port " + neighbors[i].portNumber); 
                             connectionsLeft--;
-                            madeConnection[i] = true;
+                            neighbors[i].madeConnection = true;
+                            //madeConnection[i] = true;
                             }
                         } catch (ConnectException e) {
-                            connectionRefused[i] = true;
+                            neighbors[i].connectionRefused = true;
                         } catch (IOException e) {
-                            connectionRefused[i] = true;
+                            neighbors[i].connectionRefused = true;
                         }
                     }
                 }
                 System.out.println();
                 for (int i = 0; i < peerIds.length; i++) {
-                    if (connectionRefused[i]) {
-                        logger.info("Connection refused for " + hostNames[i] + 
-                            " on port " + portNumbers[i]);
+                    if (neighbors[i].connectionRefused) {
+                        logger.info("Connection refused for " + neighbors[i].hostName + 
+                            " on port " + neighbors[i].portNumber);
                     }
                 }
                 if (connectionsLeft > 0) {
