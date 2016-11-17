@@ -137,10 +137,12 @@ public class Client {
                 //loop thru all of the received messages
                 for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
                    Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
-                    int localIndex = clientIDToPeerID[incomingMessage.clientID];
+                    //This gets the peerID of the incoming message, we have to do it like this because
+                   //this server has to know which client the message is coming from, and it's inside the message.
+                    int messageIndex = clientIDToPeerID[incomingMessage.clientID];
 
 
-                    if (localIndex == -1 && !(incomingMessage.type == (byte)Message.handshake)) {
+                    if (messageIndex == -1 && !(incomingMessage.type == (byte)Message.handshake)) {
                         //We haven't received the handshake yet so skip to next iteration:
                         continue;
                     }
@@ -153,8 +155,8 @@ public class Client {
                         //Length holds the peer ID in a handshake message:
                         clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
                         //We have received the handshake lets set it and print it out
-                        neighbors[localIndex].hasHandshakeReceived = true;
-                        logger.info("Received handshake from host:" + neighbors[localIndex].hostName + " on port:" + neighbors[localIndex].portNumber);
+                        neighbors[messageIndex].hasHandshakeReceived = true;
+                        logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
                         break;
                     }
                     /*
@@ -163,14 +165,14 @@ public class Client {
                     case (byte)Message.bitfield:
                     {
                         //it is a bitfield:
-                        neighbors[localIndex].bitmap = incomingMessage.payload;
-                        neighbors[localIndex].hasBitfieldReceived = true;
+                        neighbors[messageIndex].bitmap = incomingMessage.payload;
+                        neighbors[messageIndex].hasBitfieldReceived = true;
 
                         //Check to see if we need to send interested or uninterested to the sender
                         //As per project requirement
-                        if (neighbors[localIndex].hasFile) {}
+                        if (neighbors[messageIndex].hasFile) {}
 
-                        logger.info("Received bitfield from host:" + neighbors[localIndex].hostName + " on port:" + neighbors[localIndex].portNumber);
+                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
                         break;
                     }
 
