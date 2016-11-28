@@ -168,14 +168,35 @@ public class Client {
                         neighbors[messageIndex].bitmap = incomingMessage.payload;
                         neighbors[messageIndex].hasBitfieldReceived = true;
 
+                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
                         //Check to see if we need to send interested or uninterested to the sender
                         //As per project requirement
                         if (checkIfNeedPieces(neighbors[messageIndex])) {
+                            //This person has some pieces that we are interested in
                             //Send that we are interested
                             sendInterested(messageIndex);
+                        } else {
+                            //Send that we are not interested currently:
+                            sendNotInterested(messageIndex);
                         }
 
-                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
+                        
+                        break;
+                    }
+                    //Message type is interested
+                    case (byte)Message.interested:
+                    {
+                        neighbors[messageIndex].interested = true;
+                        logger.info("Peer " + peerIds[ownIndex] + " received the 'interested' message from " + neighbors[messageIndex].peerId);
+                        break;
+                    }
+
+
+                    //Message type is not interested
+                    case (byte)Message.not_interested:
+                    {
+                        neighbors[messageIndex].interested = false;
+                        logger.info("Peer " + peerIds[ownIndex] + " received the 'not interested' message from " + neighbors[messageIndex].peerId);
                         break;
                     }
 
