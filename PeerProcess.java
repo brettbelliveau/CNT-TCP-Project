@@ -50,7 +50,8 @@ public class PeerProcess {
 			return;
 		}
 		//Initialize client
-		Client client = new Client(peerId, peerIds, hostNames, portNumbers, hasFile, fileSize, pieceSize);
+		Client client = new Client(peerId, peerIds, hostNames, 
+			portNumbers, hasFile, fileSize, pieceSize, fileName);
 	}
 
 	public static void readPeerId(String[] args) {

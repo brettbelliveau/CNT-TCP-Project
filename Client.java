@@ -23,6 +23,8 @@ public class Client {
     static int[] peerIds;
     static Logger logger;
     static FileHandler fileHandler;
+    static byte[][] filePieces;
+    static String fileName;
 
     static int[] clientIDToPeerID; // Holds the conversion for converting a client ID to peer ids
 
@@ -33,11 +35,12 @@ public class Client {
 
     static ServerListener serverListener;
 
-    public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile, int fileSize, int pieceSize) {
+    public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile, int fileSize, int pieceSize, String fileName) {
         this.peerId = peerId;
         this.peerIds = peerIds;
         this.fileSize = fileSize;
         this.pieceSize = pieceSize;
+        this.fileName = fileName;
 
         ownIndex = Arrays.binarySearch(peerIds, peerId);
         //Initialize bitmap to the file size divided by the piece size and then add one because we cast it to an int
@@ -45,6 +48,9 @@ public class Client {
         numberOfBits = (int)(fileSize/pieceSize + 1);
         numberOfBytes = (int)(numberOfBits/8 + 1);
         bitfield = new byte[numberOfBytes];
+
+        //Set up for local logging (this process)
+        prepareLogging();
 
         //Set all of the bits to true if we have the file:
         if (hasFile[ownIndex]) {
@@ -60,7 +66,10 @@ public class Client {
                 array = Arrays.copyOfRange(array, 1, array.length);
             }
             bitfield = array;
-        }
+
+         }
+        
+        initializeFilePieces(hasFile[ownIndex]);
 
         //Initialize our neighbor data:
         neighbors = new Neighbor[peerIds.length];
@@ -70,6 +79,7 @@ public class Client {
             //init to -1 so we know which ones arent being used
             clientIDToPeerID[i] = -1;
             //Init neighbors
+            neighbors[i] = new Neighbor();
             neighbors[i].peerId = peerIds[i];
             neighbors[i].hostName = hostNames[i];
             neighbors[i].portNumber = portNumbers[i];
@@ -83,9 +93,6 @@ public class Client {
 
         
         //madeConnection[ownIndex] = true;
-
-        //Set up for local logging (this process)
-        prepareLogging();
 
         run();
     }
@@ -290,6 +297,14 @@ public class Client {
         sendMessage(message.getMessageBytes(), index);
     }
 
+   	private static void sendFilePiece(int pieceNumber, int index) {
+		//Send file piece to a given server    		
+   		Message message = new Message(pieceSize, (byte)Message.piece, filePieces[pieceNumber]);
+   	
+   		logger.info("Sending piece number " + pieceNumber + " to server " + index);
+   		sendMessage(message.getMessageBytes(), index); 
+    }
+
     private static boolean checkIfNeedPieces(Neighbor neighbor) {
         BigInteger incomingBitfieldInt = new BigInteger(neighbor.bitmap);
         BigInteger selfBitfieldInt = new BigInteger(bitfield);
@@ -376,6 +391,32 @@ public class Client {
         catch(IOException ioException){
             ioException.printStackTrace();
         }
+    }
+
+    private static void initializeFilePieces(boolean hasFile) {
+    	filePieces = new byte[(fileSize/pieceSize)+1][pieceSize];
+    	
+    	if (!hasFile)
+    		return;
+
+    	try {
+    	 	File file = new File(fileName);
+    	 	FileInputStream inputStream = new FileInputStream(file);
+
+            int currentPieceSize, currentPieceIndex;
+            currentPieceIndex = currentPieceSize = 0;
+
+            while (currentPieceIndex < filePieces.length) {
+            	currentPieceSize = inputStream.read(filePieces[currentPieceIndex++]);
+            }
+        } catch (Exception e) {
+        	logger.info("Error generating file pieces:");
+        }
+
+        //for (int i = 0; i < filePieces.length; i++) {
+        //	System.out.println(i);
+        //	logger.info("Bytes:" + Arrays.toString(filePieces[i]));
+        //}
     }
 
     public static void prepareLogging() {
