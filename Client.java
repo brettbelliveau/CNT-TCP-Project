@@ -23,6 +23,7 @@ public class Client {
     static int ownIndex;
     static int fileSize;
     static int pieceSize;
+    static boolean[] hasFile;
     //static boolean[] madeConnection;
     static int[] peerIds;
     static Logger logger;
@@ -45,6 +46,7 @@ public class Client {
         this.fileSize = fileSize;
         this.pieceSize = pieceSize;
         this.fileName = fileName;
+        this.hasFile = hasFile;
 
         ownIndex = Arrays.binarySearch(peerIds, peerId);
         //Initialize bitmap to the file size divided by the piece size and then add one because we cast it to an int
@@ -72,7 +74,7 @@ public class Client {
             bitfield = array;
 
          }
-        
+
         initializeFilePieces(hasFile[ownIndex]);
 
         //Initialize our neighbor data:
@@ -117,12 +119,18 @@ public class Client {
                 if (i != ownIndex && neighbors[i].madeConnection) {       
                     out[i] = new ObjectOutputStream(requestSocket[i].getOutputStream());
                     out[i].flush();
-                    System.out.println(i);
                 }
             }
+            int iteration = 0;
             //Main loop that checks if we need to send or receive messages
             while (true) {
-
+            	if (iteration++ == 1) {
+            		try{ Thread.sleep(1000); } catch(Exception e){}
+            		if (hasFile[ownIndex]) {
+            			logger.info("Index " + ownIndex + " has file. Sending now");
+            			sendFilePiece(0, ((ownIndex+1)%2));
+        			}
+            	}
             //This is where we check to see if we need to send any messages:
             for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex) {
@@ -146,30 +154,45 @@ public class Client {
             //Now check if we have received messages from any clients (Synchronized, thread safe):
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
+
                 for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
-                   Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
+                    Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
                     //This gets the peerID of the incoming message, we have to do it like this because
                    //this server has to know which client the message is coming from, and it's inside the message.
                     int messageIndex = clientIDToPeerID[incomingMessage.clientID];
 
-                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                    byte[] messageByte = new byte[1];
-                    messageByte[0] = incomingMessage.type;
-                    String typeStr = new String(messageByte);
-
-                    if (messageIndex == -1 && !(typeStr.equals(Integer.toString(Message.handshake)))) {
+                    if (messageIndex == -1 && !((int)incomingMessage.type == Message.handshake)) {
                         //We haven't received the handshake yet so skip to next iteration:
                         continue;
                     }
 
+                    if ((int)incomingMessage.type != Message.handshake) {
+	                    for (int i = 0; i < peerIds.length; i++) {
+	                       		System.out.println(peerIds[i]);
+	                       		System.out.println(messageIndex);
+	                       		if (peerIds[i] == messageIndex) {
+	                       			messageIndex = i;
+	                       			break;
+	               			}
+	                   	}
+                    }
                    //Using a switch statement base on which type this message is:
-                   switch (incomingMessage.type) {
-                    case (byte)Message.handshake:
+                   switch ((int)incomingMessage.type) {
+                    case Message.handshake:
                     {
                         //it is a handshake:
                         //Length holds the peer ID in a handshake message:
                         clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
-                        //We have received the handshake lets set it and print it out
+                       	
+						for (int i = 0; i < peerIds.length; i++) {
+	                       		System.out.println(peerIds[i]);
+	                       		System.out.println(incomingMessage.length);
+	                       		if (peerIds[i] == incomingMessage.length) {
+	                       			messageIndex = i;
+	                       			break;
+	                       		}
+	                   	}
+                       	//We have received the handshake lets set it and print it out
                         neighbors[messageIndex].hasHandshakeReceived = true;
                         logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
                         break;
@@ -177,7 +200,7 @@ public class Client {
                     /*
                      * Here is the case in which we receive a bitfield:
                      */
-                    case (byte)Message.bitfield:
+                    case Message.bitfield:
                     {
                         //it is a bitfield:
                         neighbors[messageIndex].bitmap = incomingMessage.payload;
@@ -199,7 +222,7 @@ public class Client {
                         break;
                     }
                     //Message type is interested
-                    case (byte)Message.interested:
+                    case Message.interested:
                     {
                         neighbors[messageIndex].interested = true;
                         logger.info("Peer " + peerIds[ownIndex] + " received the 'interested' message from " + neighbors[messageIndex].peerId);
@@ -208,7 +231,7 @@ public class Client {
 
 
                     //Message type is not interested
-                    case (byte)Message.not_interested:
+                    case Message.not_interested:
                     {
                         neighbors[messageIndex].interested = false;
                         logger.info("Peer " + peerIds[ownIndex] + " received the 'not interested' message from " + neighbors[messageIndex].peerId);
@@ -237,6 +260,7 @@ public class Client {
             System.err.println("You are trying to connect to an unknown host!");
         }
         catch(IOException ioException) {
+            System.err.print("IOException:");	
             ioException.printStackTrace();
         } 
         //catch (InterruptedException e) {
@@ -308,7 +332,7 @@ public class Client {
    	private static void sendFilePiece(int pieceNumber, int index) {
 		//Send file piece to a given server    		
    		Message message = new Message(pieceSize, (byte)Message.piece, filePieces[pieceNumber]);
-   	
+   		
    		logger.info("Sending piece number " + pieceNumber + " to server " + index);
    		sendMessage(message.getMessageBytes(), index); 
     }
@@ -397,6 +421,7 @@ public class Client {
             out[socketIndex].flush();
         }
         catch(IOException ioException){
+        	System.err.println("Error sending message.");
             ioException.printStackTrace();
         }
     }

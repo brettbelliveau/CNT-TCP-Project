@@ -74,7 +74,11 @@ public class Message {
 
 	public String toString() {
 		String str = "Length: " + length + 
-		", Type = " + (int)type + ", Payload:" + Arrays.toString(payload);
+		", Type = " + (int)type + ", Payload:";
+		if ((int)type == 7)
+			str += "[File Bytes]";
+		else
+			str += Arrays.toString(payload);
 		return str;
 	}
 

@@ -120,6 +120,11 @@ public class ServerListener {
                         }
                         //show the message to the user
                         System.out.println("Received message: " + message.toString() + " from client " + clientID);
+                        /*
+                         *
+                         * TODO: Add this to the logger somehow
+                         *
+                         */
                     }
                 }
                 catch(ClassNotFoundException classnot){
