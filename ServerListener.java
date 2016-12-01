@@ -1,3 +1,7 @@
+/* To compile, run the following command:
+ * javac Client.java Message.java Neighbor.java ServerListener.java PeerProcess.java
+ */
+
 import java.net.*;
 import java.io.*;
 import java.nio.*;

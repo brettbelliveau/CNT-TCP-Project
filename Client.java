@@ -1,3 +1,7 @@
+/* To compile, run the following command:
+ * javac Client.java Message.java Neighbor.java ServerListener.java PeerProcess.java
+ */
+
 import java.net.*;
 import java.io.*;
 import java.nio.*;
@@ -148,8 +152,12 @@ public class Client {
                    //this server has to know which client the message is coming from, and it's inside the message.
                     int messageIndex = clientIDToPeerID[incomingMessage.clientID];
 
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    byte[] messageByte = new byte[1];
+                    messageByte[0] = incomingMessage.type;
+                    String typeStr = new String(messageByte);
 
-                    if (messageIndex == -1 && !(incomingMessage.type == (byte)Message.handshake)) {
+                    if (messageIndex == -1 && !(typeStr.equals(Integer.toString(Message.handshake)))) {
                         //We haven't received the handshake yet so skip to next iteration:
                         continue;
                     }

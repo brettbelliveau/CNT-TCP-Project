@@ -1,3 +1,7 @@
+/* To compile, run the following command:
+ * javac Client.java Message.java Neighbor.java ServerListener.java PeerProcess.java
+ */
+
 //Public class to hold the data obtained from neighbors during the transfor process.
 public class Neighbor {
     public byte[] bitmap;
