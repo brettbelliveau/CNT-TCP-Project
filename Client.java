@@ -30,6 +30,7 @@ public class Client {
     static FileHandler fileHandler;
     static byte[][] filePieces;
     static String fileName;
+	static int requestedPieceNumber = 5; //TODO: initialize this in the sendRequest()
 
     static int[] clientIDToPeerID; // Holds the conversion for converting a client ID to peer ids
 
@@ -37,8 +38,9 @@ public class Client {
     public static byte[] bitfield;
     public int numberOfBits;
     public int numberOfBytes;
-
+    
     static ServerListener serverListener;
+    static int totalPieces = 0;
 
     public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile, int fileSize, int pieceSize, String fileName) {
         this.peerId = peerId;
@@ -123,12 +125,17 @@ public class Client {
             int iteration = 0;
             //Main loop that checks if we need to send or receive messages
             while (true) {
-            	if (iteration++ == 1) {
+
+            	//Send Message Test
+	           	if (iteration++ == 1) {
             		try{ Thread.sleep(1000); } catch(Exception e){}
             		if (hasFile[ownIndex]) {
-            			sendFilePiece(0, ((ownIndex+1)%2));
+            			System.out.println("Own index:" + ownIndex);
+            			sendFilePiece(((ownIndex+1)%2), 5);
         			}
             	}
+
+
             //This is where we check to see if we need to send any messages:
             for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex) {
@@ -152,7 +159,8 @@ public class Client {
             //Now check if we have received messages from any clients (Synchronized, thread safe):
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
-
+				//logger.info("Size: " + serverListener.receivedMessages.size());
+	            
                 for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
                     Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
                     //This gets the peerID of the incoming message, we have to do it like this because
@@ -173,89 +181,108 @@ public class Client {
 	                   	}
                     }
                    //Using a switch statement base on which type this message is:
-                   switch ((int)incomingMessage.type) {
-                    case Message.handshake:
-                    {
-                        //it is a handshake:
-                        //Length holds the peer ID in a handshake message:
-                        clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
-                       	
-						for (int i = 0; i < peerIds.length; i++) {
-	                       		if (peerIds[i] == incomingMessage.length) {
-	                       			messageIndex = i;
-	                       			break;
-	                       		}
-	                   	}
-                       	//We have received the handshake lets set it and print it out
-                        neighbors[messageIndex].hasHandshakeReceived = true;
-                        logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
-                        break;
-                    }
-                    /*
-                     * Here is the case in which we receive a bitfield:
-                     */
-                    case Message.bitfield:
-                    {
-                        //it is a bitfield:
-                        neighbors[messageIndex].bitmap = incomingMessage.payload;
-                        neighbors[messageIndex].hasBitfieldReceived = true;
+                   	switch ((int)incomingMessage.type) {
+                    	case Message.handshake:
+	                    {
+	                        //it is a handshake:
+	                        //Length holds the peer ID in a handshake message:
+	                        clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
+	                       	
+							for (int i = 0; i < peerIds.length; i++) {
+		                       		if (peerIds[i] == incomingMessage.length) {
+		                       			messageIndex = i;
+		                       			break;
+		                       		}
+		                   	}
+	                       	//We have received the handshake lets set it and print it out
+	                        neighbors[messageIndex].hasHandshakeReceived = true;
+	                        logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
+	                        break;
+	                    }
+	                    /*
+	                     * Here is the case in which we receive a bitfield:
+	                     */
+	                    case Message.bitfield:
+	                    {
+	                        //it is a bitfield:
+	                        neighbors[messageIndex].bitmap = incomingMessage.payload;
+	                        neighbors[messageIndex].hasBitfieldReceived = true;
 
-                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
-                        //Check to see if we need to send interested or uninterested to the sender
-                        //As per project requirement
-                        if (checkIfNeedPieces(neighbors[messageIndex])) {
-                            //This person has some pieces that we are interested in
-                            //Send that we are interested
-                            sendInterested(messageIndex);
-                        } else {
-                            //Send that we are not interested currently:
-                            sendNotInterested(messageIndex);
-                        }
+	                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
+	                        //Check to see if we need to send interested or uninterested to the sender
+	                        //As per project requirement
+	                        if (checkIfNeedPieces(neighbors[messageIndex])) {
+	                            //This person has some pieces that we are interested in
+	                            //Send that we are interested
+	                            sendInterested(messageIndex);
+	                        } else {
+	                            //Send that we are not interested currently:
+	                            sendNotInterested(messageIndex);
+	                        }
 
-                        
-                        break;
-                    }
-                    //Message type is interested
-                    case Message.interested:
-                    {
-                        neighbors[messageIndex].interested = true;
-                        logger.info("Peer " + peerIds[ownIndex] + " received the 'interested' message from " + neighbors[messageIndex].peerId + '\n');
-                        break;
-                    }
+	                        
+	                        break;
+	                    }
+	                    //Message type is interested
+	                    case Message.interested:
+	                    {
+	                        neighbors[messageIndex].interested = true;
+	                        logger.info("Peer " + peerIds[ownIndex] + " received the 'interested' message from " + neighbors[messageIndex].peerId + '\n');
+	                        break;
+	                    }
 
 
-                    //Message type is not interested
-                    case Message.not_interested:
-                    {
-                        neighbors[messageIndex].interested = false;
-                        logger.info("Peer " + peerIds[ownIndex] + " received the 'not interested' message from " + neighbors[messageIndex].peerId + '\n');
-                        break;
-                    }
+	                    //Message type is not interested
+	                    case Message.not_interested:
+	                    {
+	                        neighbors[messageIndex].interested = false;
+	                        logger.info("Peer " + peerIds[ownIndex] + " received the 'not interested' message from " + neighbors[messageIndex].peerId + '\n');
+	                        break;
+	                    }
 
-                    //Message type is file piece
-                    case Message.piece:
-                    {
-                    	filePieces[incomingMessage.pieceNumber] = incomingMessage.payload;
+	                    case Message.have:
+	                    {
+	                    	ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
-                    	BigInteger tempField = new BigInteger(bitfield);
-                    	tempField.setBit(incomingMessage.pieceNumber);
-                    	bitfield = tempField.toByteArray();
-                    	
-                    	logger.info("Peer " + peerIds[ownIndex] + " received the requested file piece from " + neighbors[messageIndex].peerId + '\n');
-                    	break;
-                    }
+	                    	logger.info("Peer " + peerIds[ownIndex] + " received the 'have' message from " + neighbors[messageIndex].peerId + 
+	                    		" for the piece " + buffer.getInt() + "." +'\n');
+	                        break;
+	                    }
 
-                    //Default statement to catch errors:
-                    default:
-                    System.out.println("Error unknown type: " + (int)incomingMessage.type);
-                    break;
+	                    //Message type is file piece
+	                    case Message.piece:
+	                    {
+	                    	filePieces[requestedPieceNumber] = incomingMessage.payload;
+
+	                    	BigInteger tempField = new BigInteger(bitfield);
+	                    	tempField.setBit(requestedPieceNumber); //update with most recently requested number
+	                    	bitfield = tempField.toByteArray();
+	                    	
+	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + requestedPieceNumber 
+	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n');
+	                    	
+	                    	for (int i = 0; i < peerIds.length; i++) {
+	                    		if (i == ownIndex)
+	                    			continue;
+	                			sendHave(i, requestedPieceNumber);
+	                    	}
+	                    	
+							//TODO: Request logic
+							//sendRequest();
+	                    	break;
+	                    }
+
+	                    //Default statement to catch errors:
+	                    default:
+	                    System.out.println("Error unknown type: " + (int)incomingMessage.type);
+	                    break;
+	                }
+	                //After we have parsed this message we are done with it, remove it:
+	                serverListener.receivedMessages.remove(j);
                 }
-                //After we have parsed this message we are done with it, remove it:
-                serverListener.receivedMessages.remove(j);
-            }
-        }
+	        }
 
-    }
+	    }
 }
         catch (ConnectException e) {
             System.err.println("Connection refused. You need to initiate a server first.");
@@ -302,7 +329,7 @@ public class Client {
             byte[] peeridArray = ByteBuffer.allocate(4).putInt(peerId).array();
 
             ByteBuffer handshakeBuffer = ByteBuffer.allocate(32);
-            
+
             handshakeBuffer.put(handshakeHeader);
             handshakeBuffer.put(zeroBits);
             handshakeBuffer.put(peeridArray);
@@ -336,12 +363,20 @@ public class Client {
         sendMessage(message.getMessageBytes(), index);
     }
 
-   	private static void sendFilePiece(int pieceNumber, int index) {
+    private static void sendHave(int index, int pieceNumber) {
+    	//send a have message to a given inde
+    	byte[] pieceIndex = ByteBuffer.allocate(4).putInt(pieceNumber).array();
+    	Message message = new Message(4,(byte)Message.have,pieceIndex);
+
+		logger.info("Sending have " + pieceNumber + " to server " + index + '\n');
+
+    	sendMessage(message.getMessageBytes(), index);
+    }
+
+   	private static void sendFilePiece(int index, int pieceNumber) {
 		//Send file piece to a given server    		
    		Message message = new Message(pieceSize, (byte)Message.piece, filePieces[pieceNumber]);
-   		message.pieceNumber = pieceNumber;
 
-   		logger.info("Sending piece number " + pieceNumber + " to server " + index + '\n');
    		sendMessage(message.getMessageBytes(), index); 
     }
 
