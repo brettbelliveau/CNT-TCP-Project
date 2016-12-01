@@ -64,7 +64,6 @@ public class Client {
             BigInteger bigInt = new BigInteger("0");
             for (int i = 0; i < numberOfBits; i++) {
                 bigInt = bigInt.setBit(i);
-                System.out.println(bigInt.toString());
             }
             byte[] array = bigInt.toByteArray();
             //Here we handle the case where the sign carries over since BigInt is signed:
@@ -113,7 +112,7 @@ public class Client {
             initConnections();
 
             logger.info("All connections have been established.");
-
+            logger.info("" + '\n');
             //initialize outputStreams
             for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex && neighbors[i].madeConnection) {       
@@ -127,7 +126,6 @@ public class Client {
             	if (iteration++ == 1) {
             		try{ Thread.sleep(1000); } catch(Exception e){}
             		if (hasFile[ownIndex]) {
-            			logger.info("Index " + ownIndex + " has file. Sending now");
             			sendFilePiece(0, ((ownIndex+1)%2));
         			}
             	}
@@ -139,14 +137,14 @@ public class Client {
                         //Send the bitfield
                         sendHandshake(i);
                         neighbors[i].hasHandshakeSent = true;
-                        logger.info("Sent handshake to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber);
+                        logger.info("Sent handshake to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber + '\n');
                     }
                     //if we havent sent the bitfield and we are connected and we have received the handshake:
                     if (!neighbors[i].hasBitfieldSent && neighbors[i].madeConnection && neighbors[i].hasHandshakeReceived) {
                         //Send the bitfield
                         sendBitfield(i);
                         neighbors[i].hasBitfieldSent = true;
-                        logger.info("Sent bitfield to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber);
+                        logger.info("Sent bitfield to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber + '\n');
                     }
                 }
             }
@@ -168,8 +166,6 @@ public class Client {
 
                     if ((int)incomingMessage.type != Message.handshake) {
 	                    for (int i = 0; i < peerIds.length; i++) {
-	                       		System.out.println(peerIds[i]);
-	                       		System.out.println(messageIndex);
 	                       		if (peerIds[i] == messageIndex) {
 	                       			messageIndex = i;
 	                       			break;
@@ -185,8 +181,6 @@ public class Client {
                         clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
                        	
 						for (int i = 0; i < peerIds.length; i++) {
-	                       		System.out.println(peerIds[i]);
-	                       		System.out.println(incomingMessage.length);
 	                       		if (peerIds[i] == incomingMessage.length) {
 	                       			messageIndex = i;
 	                       			break;
@@ -194,7 +188,7 @@ public class Client {
 	                   	}
                        	//We have received the handshake lets set it and print it out
                         neighbors[messageIndex].hasHandshakeReceived = true;
-                        logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
+                        logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
                         break;
                     }
                     /*
@@ -206,7 +200,7 @@ public class Client {
                         neighbors[messageIndex].bitmap = incomingMessage.payload;
                         neighbors[messageIndex].hasBitfieldReceived = true;
 
-                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber);
+                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
                         //Check to see if we need to send interested or uninterested to the sender
                         //As per project requirement
                         if (checkIfNeedPieces(neighbors[messageIndex])) {
@@ -225,7 +219,7 @@ public class Client {
                     case Message.interested:
                     {
                         neighbors[messageIndex].interested = true;
-                        logger.info("Peer " + peerIds[ownIndex] + " received the 'interested' message from " + neighbors[messageIndex].peerId);
+                        logger.info("Peer " + peerIds[ownIndex] + " received the 'interested' message from " + neighbors[messageIndex].peerId + '\n');
                         break;
                     }
 
@@ -234,13 +228,26 @@ public class Client {
                     case Message.not_interested:
                     {
                         neighbors[messageIndex].interested = false;
-                        logger.info("Peer " + peerIds[ownIndex] + " received the 'not interested' message from " + neighbors[messageIndex].peerId);
+                        logger.info("Peer " + peerIds[ownIndex] + " received the 'not interested' message from " + neighbors[messageIndex].peerId + '\n');
                         break;
+                    }
+
+                    //Message type is file piece
+                    case Message.piece:
+                    {
+                    	filePieces[incomingMessage.pieceNumber] = incomingMessage.payload;
+
+                    	BigInteger tempField = new BigInteger(bitfield);
+                    	tempField.setBit(incomingMessage.pieceNumber);
+                    	bitfield = tempField.toByteArray();
+                    	
+                    	logger.info("Peer " + peerIds[ownIndex] + " received the requested file piece from " + neighbors[messageIndex].peerId + '\n');
+                    	break;
                     }
 
                     //Default statement to catch errors:
                     default:
-                    System.out.println("Error unknown type.");
+                    System.out.println("Error unknown type: " + (int)incomingMessage.type);
                     break;
                 }
                 //After we have parsed this message we are done with it, remove it:
@@ -332,8 +339,9 @@ public class Client {
    	private static void sendFilePiece(int pieceNumber, int index) {
 		//Send file piece to a given server    		
    		Message message = new Message(pieceSize, (byte)Message.piece, filePieces[pieceNumber]);
-   		
-   		logger.info("Sending piece number " + pieceNumber + " to server " + index);
+   		message.pieceNumber = pieceNumber;
+
+   		logger.info("Sending piece number " + pieceNumber + " to server " + index + '\n');
    		sendMessage(message.getMessageBytes(), index); 
     }
 
@@ -367,14 +375,16 @@ public class Client {
                 for (int i = 0; i < peerIds.length; i++) {
                     if (i != ownIndex && !neighbors[i].madeConnection) {
                         logger.info("Attempting to connect to " + neighbors[i].hostName + 
-                            " on port " + neighbors[i].portNumber);
+                            " on port " + neighbors[i].portNumber + '\n');
+
                         try {
                             //create a socket to connect to the server
                             requestSocket[i] = new Socket(neighbors[i].hostName, neighbors[i].portNumber);
 
                             if (requestSocket[i].isConnected()) {
                             logger.info("Connected to " + neighbors[i].hostName + 
-                                " in port " + neighbors[i].portNumber); 
+                                " in port " + neighbors[i].portNumber + '\n');
+
                             connectionsLeft--;
                             neighbors[i].madeConnection = true;
                             //madeConnection[i] = true;
@@ -390,21 +400,15 @@ public class Client {
                 for (int i = 0; i < peerIds.length; i++) {
                     if (neighbors[i].connectionRefused) {
                         logger.info("Connection refused for " + neighbors[i].hostName + 
-                            " on port " + neighbors[i].portNumber);
+                            " on port " + neighbors[i].portNumber + '\n');
+
                     }
                 }
                 if (connectionsLeft > 0) {
                 //Wait four seconds before attempting to reconnect
                     try {
-                    System.out.println();
-                    System.out.print("Waiting to reconnect");
-                    System.out.print(".");
-                    Thread.sleep(1000);
-                    System.out.print(".");
-                    Thread.sleep(1000);
-                    System.out.print(".");
-                    Thread.sleep(1000);
-                    System.out.println();
+                    logger.info("Waiting to reconnect.." + '\n');
+                    Thread.sleep(3000);
                     } catch (Exception e) {
 
                     }

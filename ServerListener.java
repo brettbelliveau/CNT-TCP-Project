@@ -43,7 +43,7 @@ public class ServerListener {
             int clientNum = 0;
             ServerSocket listener = null;
             try {
-                while(true) {
+                while (true) {
                     try {
                         listener = new ServerSocket(portNumber);
                         new Handler(listener.accept(),clientNum).start();

@@ -31,6 +31,7 @@ public class Message {
 	public byte type;
 	public byte[] lengthB;
 	public byte[] payload;
+	public int pieceNumber;
 
 	public Message(){}
 
