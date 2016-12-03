@@ -158,7 +158,7 @@ public class Client {
 	           	if (iteration++ == 1) {
             		try{ Thread.sleep(1000); } catch(Exception e){}
             		if (hasFile[ownIndex]) {
-            			sendFilePiece(((ownIndex+1)%2), 5);
+            			sendRequest(((ownIndex+1)%2), 0);
         			}
             	}
 
@@ -184,21 +184,21 @@ public class Client {
             }
 
 
-            if (iteration++ == 1) {
-              timer1.scheduleAtFixedRate(new TimerTask() {
-                 @Override
-                  public void run(){
-                     determinePreferredNeighbors();
-                  }
-                 },0, PeerProcess.unchokingInterval * 1000);
+            // if (iteration++ == 1) {
+            //   timer1.scheduleAtFixedRate(new TimerTask() {
+            //      @Override
+            //       public void run(){
+            //          determinePreferredNeighbors();
+            //       }
+            //      },0, PeerProcess.unchokingInterval * 1000);
 
-               timer2.scheduleAtFixedRate(new TimerTask() {
-                 @Override
-                  public void run(){
-                     determineOptimisticNeighbor();
-                  }
-                },0, PeerProcess.optimisticUnchokingInterval * 1000);
-            }
+            //    timer2.scheduleAtFixedRate(new TimerTask() {
+            //      @Override
+            //       public void run(){
+            //          determineOptimisticNeighbor();
+            //       }
+            //     },0, PeerProcess.optimisticUnchokingInterval * 1000);
+            // }
 
             //Trying to fix messages:
             List<Message> messagesToRemove = new ArrayList<Message>();
@@ -209,6 +209,7 @@ public class Client {
 
                 for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
                     Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
+                    System.out.println("Client LOOP:" + incomingMessage.toString());
                     //This gets the peerID of the incoming message, we have to do it like this because
                    //this server has to know which client the message is coming from, and it's inside the message.
                     int messageIndex = clientIDToPeerID[incomingMessage.clientID];
@@ -226,7 +227,7 @@ public class Client {
 	               			}
 	                   	}
                     }
-
+                    
                    //Using a switch statement base on which type this message is:
                    	switch ((int)incomingMessage.type) {
                     	case Message.handshake:
@@ -289,15 +290,19 @@ public class Client {
 
 	                    case Message.have:
 	                    {
+							for (byte b : incomingMessage.payload) {
+            				    System.out.println(Integer.toBinaryString(b & 255 | 256).substring(1));
+            				}
 	                    	ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
                             BigInteger tempField = new BigInteger(neighbors[messageIndex].bitmap);
-                            tempField.setBit(buffer.getInt()); //update with sent 'have' index
+                            int thisIndex = buffer.getInt();
+                            tempField.setBit(thisIndex); //update with sent 'have' index
                             neighbors[messageIndex].bitmap = tempField.toByteArray();
 
 
 	                    	logger.info("Peer " + peerIds[ownIndex] + " received the 'have' message from " + neighbors[messageIndex].peerId +
-	                    		" for the piece " + buffer.getInt() + "." +'\n');
+	                    		" for the piece " + thisIndex + "." +'\n');
 
                             //Determine if interested
 	                        if (bitfield[messageIndex] == 0)
@@ -344,9 +349,7 @@ public class Client {
 
                             if (interestingPieces.size() > 0) {
                                 requestedPieceNumber = rng.nextInt(interestingPiecesArray.length);
-
-                                if (!neighbors[messageIndex].choked)  //This might be wrong
-    							  sendRequest(messageIndex, requestedPieceNumber);
+								sendRequest(messageIndex, requestedPieceNumber);
                             }
 
                             else {
@@ -374,9 +377,9 @@ public class Client {
                         {
                             ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
-                            if (!neighbors[messageIndex].choked)    //This might be wrong
+                            if (true/*!neighbors[messageIndex].choked*/)    //Uncomment to run legit m,m.
                               sendFilePiece(messageIndex, buffer.getInt());
-                            
+                            break;
                         }
 
                         case Message.choke:
