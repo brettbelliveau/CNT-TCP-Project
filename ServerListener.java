@@ -64,6 +64,11 @@ public class ServerListener {
 
     private Message convertToMessage(byte[] data, int clientID) {
         //Check for handshake:
+        try {
+            Thread.sleep(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         if (data.length >= 18) {
             byte[] bytes = Arrays.copyOfRange(data, 0, 18);
             String header = new String(bytes, Charset.forName("UTF-8"));

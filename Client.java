@@ -200,6 +200,8 @@ public class Client {
                 },0, PeerProcess.optimisticUnchokingInterval * 1000);
             }
 
+            //Trying to fix messages:
+            List<Message> messagesToRemove = new ArrayList<Message>();
             //Now check if we have received messages from any clients (Synchronized, thread safe):
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
@@ -398,7 +400,11 @@ public class Client {
 	                     break;
 	                }
 	                //After we have parsed this message we are done with it, remove it:
-	                serverListener.receivedMessages.remove(j);
+	                messagesToRemove.add(serverListener.receivedMessages.get(j));
+                }
+
+                for (Message m : messagesToRemove) {
+                    serverListener.receivedMessages.remove(m);
                 }
 	        }
 
