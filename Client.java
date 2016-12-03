@@ -12,6 +12,7 @@ import java.util.logging.*;
 import java.math.BigInteger;
 
 
+
 public class Client {
     static Socket requestSocket[];           //socket connect to the server
     static ObjectOutputStream out[];         //stream write to the socket
@@ -30,17 +31,24 @@ public class Client {
     static FileHandler fileHandler;
     static byte[][] filePieces;
     static String fileName;
-	static int requestedPieceNumber = 5; //TODO: initialize this in the sendRequest()
-
+	  static int requestedPieceNumber = 5; //TODO: initialize this in the sendRequest()
     static int[] clientIDToPeerID; // Holds the conversion for converting a client ID to peer ids
 
     public static Neighbor[] neighbors;
     public static byte[] bitfield;
     public int numberOfBits;
     public int numberOfBytes;
-    
+
     static ServerListener serverListener;
     static int totalPieces = 0;
+
+    static int[] dataReceived;
+    static int[] preferredNeighbors;  //Array containing the indices of K preferred neighbors
+    static int optimisticNeighbor; //index of optimistically unchoked neighbor
+    static Random rng;
+    static Timer timer1;
+    static Timer timer2;
+
 
     public Client(int peerId, int[] peerIds, String[] hostNames, int[] portNumbers, boolean[] hasFile, int fileSize, int pieceSize, String fileName) {
         this.peerId = peerId;
@@ -98,8 +106,13 @@ public class Client {
         out = new ObjectOutputStream[peerIds.length];
         //in = new ObjectInputStream[peerIds.length];
 
-        
+
         //madeConnection[ownIndex] = true;
+        rng = new Random();
+        dataReceived = new int[peerIds.length];
+        preferredNeighbors = new int[PeerProcess.numberOfPreferredNeighbors];
+        timer1 = new Timer();
+        timer2 = new Timer();
 
         run();
     }
@@ -109,7 +122,7 @@ public class Client {
             //Starts our server listener which will create multiple sockets based on how many clients connect
             serverListener = new ServerListener(peerIds[ownIndex], neighbors[ownIndex].hostName, neighbors[ownIndex].portNumber);
 
-            
+
             //This checks for connections to the other clients
             initConnections();
 
@@ -117,7 +130,7 @@ public class Client {
             logger.info("" + '\n');
             //initialize outputStreams
             for (int i = 0; i < peerIds.length; i++) {
-                if (i != ownIndex && neighbors[i].madeConnection) {       
+                if (i != ownIndex && neighbors[i].madeConnection) {
                     out[i] = new ObjectOutputStream(requestSocket[i].getOutputStream());
                     out[i].flush();
                 }
@@ -156,11 +169,28 @@ public class Client {
                 }
             }
 
+
+            if (iteration++ == 1) {
+              timer1.scheduleAtFixedRate(new TimerTask() {
+                 @Override
+                  public void run(){
+                     determinePreferredNeighbors();
+                  }
+                 },0, PeerProcess.unchokingInterval * 1000);
+
+               timer2.scheduleAtFixedRate(new TimerTask() {
+                 @Override
+                  public void run(){
+                     determineOptimisticNeighbor();
+                  }
+                },0, PeerProcess.optimisticUnchokingInterval * 1000);
+            }
+
             //Now check if we have received messages from any clients (Synchronized, thread safe):
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
 				//logger.info("Size: " + serverListener.receivedMessages.size());
-	            
+
                 for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
                     Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
                     //This gets the peerID of the incoming message, we have to do it like this because
@@ -187,7 +217,7 @@ public class Client {
 	                        //it is a handshake:
 	                        //Length holds the peer ID in a handshake message:
 	                        clientIDToPeerID[incomingMessage.clientID] = incomingMessage.length;
-	                       	
+
 							for (int i = 0; i < peerIds.length; i++) {
 		                       		if (peerIds[i] == incomingMessage.length) {
 		                       			messageIndex = i;
@@ -220,7 +250,7 @@ public class Client {
 	                            sendNotInterested(messageIndex);
 	                        }
 
-	                        
+
 	                        break;
 	                    }
 	                    //Message type is interested
@@ -244,7 +274,7 @@ public class Client {
 	                    {
 	                    	ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
-	                    	logger.info("Peer " + peerIds[ownIndex] + " received the 'have' message from " + neighbors[messageIndex].peerId + 
+	                    	logger.info("Peer " + peerIds[ownIndex] + " received the 'have' message from " + neighbors[messageIndex].peerId +
 	                    		" for the piece " + buffer.getInt() + "." +'\n');
 	                        break;
 	                    }
@@ -257,20 +287,38 @@ public class Client {
 	                    	BigInteger tempField = new BigInteger(bitfield);
 	                    	tempField.setBit(requestedPieceNumber); //update with most recently requested number
 	                    	bitfield = tempField.toByteArray();
-	                    	
-	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + requestedPieceNumber 
+
+                        dataReceived[messageIndex] += pieceSize;
+
+	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + requestedPieceNumber
 	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n');
-	                    	
+
 	                    	for (int i = 0; i < peerIds.length; i++) {
 	                    		if (i == ownIndex)
 	                    			continue;
 	                			sendHave(i, requestedPieceNumber);
 	                    	}
-	                    	
+
+
 							//TODO: Request logic
 							//sendRequest();
 	                    	break;
 	                    }
+
+                      case Message.choke:
+                      {
+                        neighbors[messageIndex].choked = true;
+                        logger.info("Peer " + peerIds[ownIndex] + " received the 'choke' message from " + neighbors[messageIndex].peerId + '\n');
+                        break;
+                      }
+
+                      case Message.unchoke:
+                      {
+                        neighbors[messageIndex].choked = false;
+                        logger.info("Peer " + peerIds[ownIndex] + " received the 'unchoke' message from " + neighbors[messageIndex].peerId + '\n');
+                        break;
+
+                      }
 
 	                    //Default statement to catch errors:
 	                    default:
@@ -294,9 +342,9 @@ public class Client {
             System.err.println("You are trying to connect to an unknown host!");
         }
         catch(IOException ioException) {
-            System.err.print("IOException:");	
+            System.err.print("IOException:");
             ioException.printStackTrace();
-        } 
+        }
         //catch (InterruptedException e) {
             //System.err.println("Interrupted thread execution.");
         //}
@@ -324,7 +372,7 @@ public class Client {
             } catch (Exception e) {
 
             }
-            
+
             byte[] zeroBits = new byte[10];
             byte[] peeridArray = ByteBuffer.allocate(4).putInt(peerId).array();
 
@@ -333,7 +381,7 @@ public class Client {
             handshakeBuffer.put(handshakeHeader);
             handshakeBuffer.put(zeroBits);
             handshakeBuffer.put(peeridArray);
-            
+
             byte[] handshake = handshakeBuffer.array();
 
 
@@ -374,10 +422,26 @@ public class Client {
     }
 
    	private static void sendFilePiece(int index, int pieceNumber) {
-		//Send file piece to a given server    		
+		//Send file piece to a given server
    		Message message = new Message(pieceSize, (byte)Message.piece, filePieces[pieceNumber]);
 
-   		sendMessage(message.getMessageBytes(), index); 
+   		sendMessage(message.getMessageBytes(), index);
+    }
+
+    private static void sendChoke(int index) {
+      //Send a choke message to non-preferred peers
+      Message message = new Message(0,(byte)Message.choke, null);
+      System.out.println("Sending choke to index " + index);
+
+      sendMessage(message.getMessageBytes(), index);
+    }
+
+    private static void sendUnchoke(int index) {
+      //Send a choke message to non-preferred peers
+      Message message = new Message(0,(byte)Message.unchoke, null);
+      System.out.println("Sending unchoke to index " + index);
+
+      sendMessage(message.getMessageBytes(), index);
     }
 
     private static boolean checkIfNeedPieces(Neighbor neighbor) {
@@ -390,7 +454,7 @@ public class Client {
         //00001111 (incoming bitfield)
         //AND =
         //00000010
-        //NOT = 
+        //NOT =
         //11111101
         //00001111 (Now we And it with the incoming bitfield again)
         //AND =
@@ -409,7 +473,7 @@ public class Client {
 
                 for (int i = 0; i < peerIds.length; i++) {
                     if (i != ownIndex && !neighbors[i].madeConnection) {
-                        logger.info("Attempting to connect to " + neighbors[i].hostName + 
+                        logger.info("Attempting to connect to " + neighbors[i].hostName +
                             " on port " + neighbors[i].portNumber + '\n');
 
                         try {
@@ -417,7 +481,7 @@ public class Client {
                             requestSocket[i] = new Socket(neighbors[i].hostName, neighbors[i].portNumber);
 
                             if (requestSocket[i].isConnected()) {
-                            logger.info("Connected to " + neighbors[i].hostName + 
+                            logger.info("Connected to " + neighbors[i].hostName +
                                 " in port " + neighbors[i].portNumber + '\n');
 
                             connectionsLeft--;
@@ -434,7 +498,7 @@ public class Client {
                 System.out.println();
                 for (int i = 0; i < peerIds.length; i++) {
                     if (neighbors[i].connectionRefused) {
-                        logger.info("Connection refused for " + neighbors[i].hostName + 
+                        logger.info("Connection refused for " + neighbors[i].hostName +
                             " on port " + neighbors[i].portNumber + '\n');
 
                     }
@@ -467,7 +531,7 @@ public class Client {
 
     private static void initializeFilePieces(boolean hasFile) {
     	filePieces = new byte[(fileSize/pieceSize)+1][pieceSize];
-    	
+
     	if (!hasFile)
     		return;
 
@@ -493,20 +557,125 @@ public class Client {
 
     public static void prepareLogging() {
         logger = Logger.getLogger(PeerProcess.class.getName());
-        
+
         try {
             String workingDir = System.getProperty("user.dir");
-            
+
             fileHandler = new FileHandler(workingDir + "\\" + "log_peer_" + peerId + ".log");
             logger.addHandler(fileHandler);
-            
+
             SimpleFormatter formatter = new SimpleFormatter();
             fileHandler.setFormatter(formatter);
-            
+
         } catch (Exception e) {
-            e.printStackTrace();   
+            e.printStackTrace();
         }
     }
+
+    //Calculate how much data was sent in the past unchoking interval... probably have to determine
+    //how many pieces were sent and divide it by the unchoking interval (then sort?)
+    public static double calculateDownloadRate(int peer) {
+      if (neighbors[peer].madeConnection && neighbors[peer].interested && peer != ownIndex) { //Check if connection was made and peer is interested
+        //Calculate download rate
+        int val = dataReceived[peer]/PeerProcess.unchokingInterval;
+        dataReceived[peer] = 0;
+        return val;
+      }
+      else {
+        return 0;
+      }
+    }
+
+    public static void determinePreferredNeighbors() {
+        double[] downloads = new double[neighbors.length]; //Holds original indices for download values
+        double[] temp = new double[neighbors.length]; //Will hold sorted download values
+        double[] topRates = new double[preferredNeighbors.length]; //Will hold top k download values
+        boolean[] chosen = new boolean[neighbors.length]; //Will determine if a neighbor index has been chosen already
+        int topctr = 0; //Used to determine how full preferredNeighbors is
+        int startIndex = 0; //Used to break ties that don't fit into preferredNeighbors
+        int tieLength = 1;
+        int randomIndex;
+
+        for (int i = 0; i < neighbors.length; i++) {
+    		  downloads[i] = calculateDownloadRate(i); //Calculate download rate for all neighbors
+        }
+
+       System.out.println("Neighbor peer IDs: " + Arrays.toString(peerIds));
+       System.out.println("Download rates: " + Arrays.toString(downloads));
+       System.arraycopy(downloads, 0, temp, 0, downloads.length); //Copy the download rates to the temp array
+       Arrays.sort(temp); //Sorts in ascending order, reversed below
+       for (int i = 0; i < temp.length / 2; i++) {
+        double placeholder = temp[i];
+        temp[i] = temp[temp.length - 1 - i];
+        temp[temp.length - 1 - i] = placeholder;
+       }
+
+       topRates = Arrays.copyOfRange(temp,0,preferredNeighbors.length); //Take top k values
+       if ((temp.length > preferredNeighbors.length) && (temp[preferredNeighbors.length-1] == temp[preferredNeighbors.length])) { //If there is a tie that doesn't fit
+         for (int i = preferredNeighbors.length-1; i > 0; i--) { //Determine where it starts
+           if((i != 1) && (temp[i] == temp[i-1])) {
+             startIndex = i-1;
+           }
+           else {
+             break;
+           }
+         }
+
+          for (int i = startIndex; i < temp.length; i++) { //Then determine how long it is
+            if((i != temp.length-1) && (temp[i] == temp[i+1])) {
+              tieLength += 1;
+          }
+        }
+      }
+
+      for (int i = 0; i < preferredNeighbors.length; i++) { //Fill the preferredNeighbors array with proper indices
+        for(int j = 0; j < downloads.length; i++) {
+          if ((startIndex == 0 || i < startIndex) && topRates[i] == downloads[j]) { //If there wasn't a tie that didn't fit or it hasn't been reached yet
+            preferredNeighbors[i] = j; //And this value is the correct one, take the index of downloads[]
+            chosen[j] = true; //Mark as chosen
+            break;
+          }
+        }
+        if (i >= startIndex && startIndex != 0) { //If there is a tie that doesn't fit and it has been reached
+          while(true) { //Randomly probe for a proper value
+            randomIndex = rng.nextInt(downloads.length); //Select a random integer in the range [0,downloads.length) (TODO: should probably only search from proper downloads values)
+            if(downloads[randomIndex] == topRates[i] && !chosen[randomIndex]) { //If this is the right value and it hasn't been selected yet
+              preferredNeighbors[i] = randomIndex; //Take the index and add it to preferredNeighbors
+              chosen[randomIndex] = true; //Mark as chosen
+              break;
+            }
+          }
+        }
+      }
+     //}
+     System.out.println("Highest download rate peers: " + Arrays.toString(preferredNeighbors));
+
+     boolean found = false; //Determine whether to send choke or unchoke message
+     for (int i = 0; i < neighbors.length; i++) { //Loop through all neighbors
+      for (int j = 0; j < preferredNeighbors.length; j++) { //Check if neighbor i is preferred or optimistically unchoked
+       if(neighbors[i].peerId == preferredNeighbors[j]) {
+        found = true; //If so, mark true
+       }
+     }
+     if (i != ownIndex) {
+       if (found) { //If this neighbor was found
+        sendUnchoke(i); //Unchoke it
+        found = false; //And mark found as false for next neighbor
+       }
+       else
+         sendChoke(i); //Otherwise choke it
+     }
+    }
+   }
+
+
+    public static void determineOptimisticNeighbor() {
+    boolean badNeighbor = true;
+    while(badNeighbor) {
+      optimisticNeighbor = rng.nextInt(neighbors.length);
+      if(optimisticNeighbor != ownIndex)
+        badNeighbor = false;
+    }
+     sendUnchoke(optimisticNeighbor);
+   }
 }
-
-

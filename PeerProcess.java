@@ -19,11 +19,11 @@ public class PeerProcess {
 	static int peerId;
 
 	//Common configuration fields
-	static int numberOfPreferredNeighbors; 
-	static int unchokingInterval; 
-	static int optimisticUnchokingInterval; 
-	static String fileName; 
-	static int fileSize; 
+	static int numberOfPreferredNeighbors;
+	static int unchokingInterval;
+	static int optimisticUnchokingInterval;
+	static String fileName;
+	static int fileSize;
 	static int pieceSize;
 
 	//Peer configuration fields
@@ -36,25 +36,25 @@ public class PeerProcess {
 
 		//Check for peerId input
 		readPeerId(args);
-		
+
 		//Check for/consome common config file
 		readCommonCfg();
-		
+
 		//Check for/consome peer config file
 		readPeerCfg();
-		
+
 		//Create directories for peer processes
 		createPeerDirs();
-		
+
 		//Print input fields (for debugging)
 		//checkFields();
-	
+
 		if (Arrays.binarySearch(peerIds, peerId) < 0) {
 			System.out.println("Error, incorrect peerId");
 			return;
 		}
 		//Initialize client
-		Client client = new Client(peerId, peerIds, hostNames, 
+		Client client = new Client(peerId, peerIds, hostNames,
 			portNumbers, hasFile, fileSize, pieceSize, fileName);
 	}
 
@@ -66,18 +66,18 @@ public class PeerProcess {
 			System.out.println("Error: Please input Peer Id");
 			System.exit(0);
 		}
-	} 
+	}
 
 	public static void readCommonCfg() {
 		BufferedReader reader;
-		
+
 		try {
 			File file = new File("Common.cfg");
 			String line;
 			reader = new BufferedReader(new FileReader(file));
 
 			while ((line = reader.readLine()) != null) {
-			
+
 				if (line.contains("NumberOfPreferredNeighbors "))
 					numberOfPreferredNeighbors = Integer.parseInt((
 						line.split("NumberOfPreferredNeighbors ")[1]));
@@ -93,7 +93,7 @@ public class PeerProcess {
 				else if (line.contains("FileName "))
 					fileName = line.split("FileName ")[1];
 
-				else if (line.contains("FileSize ")) 
+				else if (line.contains("FileSize "))
 					fileSize = Integer.parseInt((
 						line.split("FileSize ")[1]));
 
@@ -110,11 +110,11 @@ public class PeerProcess {
 		}
 
 	}
-	
+
 	public static void readPeerCfg() {
 		BufferedReader reader;
 		Scanner sc;
-		
+
 		try {
 			File file = new File("PeerInfo.cfg");
 			int peerCount = 0;
@@ -124,15 +124,15 @@ public class PeerProcess {
  				peerCount++;
  			}
  			reader.close();
- 
+
  			reader = new BufferedReader(new FileReader(file));
  			peerIds = new int[peerCount];
  			hostNames = new String[peerCount];
  			portNumbers = new int[peerCount];
 			hasFile = new boolean[peerCount];
-			
+
 			for (int i = 0; i < peerCount; i++) {
-				
+
 				if ((line = reader.readLine()) == null)
 					throw new Exception();
 
@@ -155,7 +155,7 @@ public class PeerProcess {
 		System.out.println(peerId);
 		System.out.println("Common Fields:");
 		//Common fields
-		System.out.println(numberOfPreferredNeighbors); 
+		System.out.println(numberOfPreferredNeighbors);
 		System.out.println(unchokingInterval);
 		System.out.println(optimisticUnchokingInterval);
 		System.out.println(fileName);
@@ -163,9 +163,9 @@ public class PeerProcess {
 		System.out.println(pieceSize);
 
 		System.out.println("Peer Fields:");
-		//Peer fields 
+		//Peer fields
 		for (int i = 0; i < 6; i++) {
-			System.out.println(peerIds[i] + " " + hostNames[i] + 
+			System.out.println(peerIds[i] + " " + hostNames[i] +
 				" " + portNumbers[i] + " " + (hasFile[i] ? 1 : 0));
 		}
 	}
