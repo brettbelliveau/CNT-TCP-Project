@@ -36,8 +36,8 @@ public class Client {
 
     public static Neighbor[] neighbors;
     public static byte[] bitfield;
-    public int numberOfBits;
-    public int numberOfBytes;
+    public static int numberOfBits;
+    public static int numberOfBytes;
 
     static ServerListener serverListener;
     static int totalPieces = 0;
@@ -61,12 +61,22 @@ public class Client {
         ownIndex = Arrays.binarySearch(peerIds, peerId);
         //Initialize bitmap to the file size divided by the piece size and then add one because we cast it to an int
         //Which floors the value
-        numberOfBits = (int)(fileSize/pieceSize + 1);
-        numberOfBytes = (int)(numberOfBits/8 + 1);
-        bitfield = new byte[numberOfBytes];
 
         //Set up for local logging (this process)
-        prepareLogging();
+            prepareLogging();
+        
+
+        if (fileSize%pieceSize != 0)
+            numberOfBits = (int)(fileSize/pieceSize + 1);
+        else 
+            numberOfBits = (int)(fileSize/pieceSize);
+
+        if (numberOfBits % 8 != 0)
+            numberOfBytes = (int)(numberOfBits/8 + 1);
+        else
+            numberOfBytes = (int)(numberOfBits/8);
+
+        bitfield = new byte[numberOfBytes+1];
 
         //Set all of the bits to true if we have the file:
         if (hasFile[ownIndex]) {
@@ -76,12 +86,17 @@ public class Client {
                 bigInt = bigInt.setBit(i);
             }
             byte[] array = bigInt.toByteArray();
-            //Here we handle the case where the sign carries over since BigInt is signed:
-            if (array[0] == 0) {
-                array = Arrays.copyOfRange(array, 1, array.length);
-            }
-            bitfield = array;
 
+            //for (byte b : array) {
+            //    System.out.println(Integer.toBinaryString(b & 255 | 256).substring(1));
+            //}
+
+            //Here we handle the case where the sign carries over since BigInt is signed:
+            //if (array[0] == 0) {
+            //    array = Arrays.copyOfRange(array, 1, array.length);
+            //}
+
+            bitfield = array;
          }
 
         initializeFilePieces(hasFile[ownIndex]);
@@ -143,7 +158,6 @@ public class Client {
 	           	if (iteration++ == 1) {
             		try{ Thread.sleep(1000); } catch(Exception e){}
             		if (hasFile[ownIndex]) {
-            			System.out.println("Own index:" + ownIndex);
             			sendFilePiece(((ownIndex+1)%2), 5);
         			}
             	}
@@ -210,6 +224,7 @@ public class Client {
 	               			}
 	                   	}
                     }
+
                    //Using a switch statement base on which type this message is:
                    	switch ((int)incomingMessage.type) {
                     	case Message.handshake:
@@ -274,9 +289,19 @@ public class Client {
 	                    {
 	                    	ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
+                            BigInteger tempField = new BigInteger(neighbors[messageIndex].bitmap);
+                            tempField.setBit(buffer.getInt()); //update with sent 'have' index
+                            neighbors[messageIndex].bitmap = tempField.toByteArray();
+
+
 	                    	logger.info("Peer " + peerIds[ownIndex] + " received the 'have' message from " + neighbors[messageIndex].peerId +
 	                    		" for the piece " + buffer.getInt() + "." +'\n');
-	                        break;
+
+                            //Determine if interested
+	                        if (bitfield[messageIndex] == 0)
+                                sendInterested(messageIndex);
+
+                            break;
 	                    }
 
 	                    //Message type is file piece
@@ -288,7 +313,7 @@ public class Client {
 	                    	tempField.setBit(requestedPieceNumber); //update with most recently requested number
 	                    	bitfield = tempField.toByteArray();
 
-                        dataReceived[messageIndex] += pieceSize;
+                            dataReceived[messageIndex] += pieceSize;
 
 	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + requestedPieceNumber
 	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n');
@@ -299,31 +324,78 @@ public class Client {
 	                			sendHave(i, requestedPieceNumber);
 	                    	}
 
+                            requestedPieceNumber = -1;
 
-							//TODO: Request logic
-							//sendRequest();
+                            BigInteger ownField = new BigInteger(bitfield);
+                            BigInteger neighborField = new BigInteger(neighbors[messageIndex].bitmap);
+                            List<Integer> interestingPieces = new ArrayList<Integer>();
+
+                            for (int i = 0; i < bitfield.length; i++) {
+                                if (neighborField.testBit(i)
+                                    && !ownField.testBit(i))
+                                    interestingPieces.add(i);
+                            }
+
+                            Integer[] interestingPiecesArray = new Integer[interestingPieces.size()];
+
+                            interestingPieces.toArray(interestingPiecesArray);
+
+                            if (interestingPieces.size() > 0) {
+                                requestedPieceNumber = rng.nextInt(interestingPiecesArray.length);
+
+                                if (!neighbors[messageIndex].choked)  //This might be wrong
+    							  sendRequest(messageIndex, requestedPieceNumber);
+                            }
+
+                            else {
+                                requestedPieceNumber = -1;
+                            }
+
+                            //Check to see if not interested should be sent
+                            //For each neighbor
+                            for (int i = 0; i < neighbors.length; i++) {
+                                if (i == ownIndex)
+                                    continue;
+
+                                //Check if there is a piece it has that we do not have
+                                boolean interested = checkIfNeedPieces(neighbors[i]);
+
+                                //If there is no piece, send uninterested
+                                if (!interested) 
+                                    sendNotInterested(i);
+                            }
+
 	                    	break;
 	                    }
 
-                      case Message.choke:
-                      {
-                        neighbors[messageIndex].choked = true;
-                        logger.info("Peer " + peerIds[ownIndex] + " received the 'choke' message from " + neighbors[messageIndex].peerId + '\n');
-                        break;
-                      }
+                        case Message.request:
+                        {
+                            ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
-                      case Message.unchoke:
-                      {
-                        neighbors[messageIndex].choked = false;
-                        logger.info("Peer " + peerIds[ownIndex] + " received the 'unchoke' message from " + neighbors[messageIndex].peerId + '\n');
-                        break;
+                            if (!neighbors[messageIndex].choked)    //This might be wrong
+                              sendFilePiece(messageIndex, buffer.getInt());
+                            
+                        }
 
-                      }
+                        case Message.choke:
+                        {
+                          neighbors[messageIndex].choked = true;
+                          logger.info("Peer " + peerIds[ownIndex] + " received the 'choke' message from " + neighbors[messageIndex].peerId + '\n');
+                          break;
+                        }
 
-	                    //Default statement to catch errors:
-	                    default:
-	                    System.out.println("Error unknown type: " + (int)incomingMessage.type);
-	                    break;
+                        case Message.unchoke:
+                        {
+                          neighbors[messageIndex].choked = false;
+                          logger.info("Peer " + peerIds[ownIndex] + " received the 'unchoke' message from " + neighbors[messageIndex].peerId + '\n');
+                          break;
+
+                        }
+
+	                     //Default statement to catch errors:
+	                     default:
+	                     System.out.println("Error unknown type: " + (int)incomingMessage.type);
+	                     break;
 	                }
 	                //After we have parsed this message we are done with it, remove it:
 	                serverListener.receivedMessages.remove(j);
@@ -444,6 +516,17 @@ public class Client {
       sendMessage(message.getMessageBytes(), index);
     }
 
+    private static void sendRequest(int index, int pieceNumber) {
+        //send a request message to a given inde
+        byte[] pieceIndex = ByteBuffer.allocate(4).putInt(pieceNumber).array();
+        Message message = new Message(4,(byte)Message.request,pieceIndex);
+
+        logger.info("Sending request " + pieceNumber + " to server " + index + '\n');
+
+        sendMessage(message.getMessageBytes(), index);
+
+    }
+
     private static boolean checkIfNeedPieces(Neighbor neighbor) {
         BigInteger incomingBitfieldInt = new BigInteger(neighbor.bitmap);
         BigInteger selfBitfieldInt = new BigInteger(bitfield);
@@ -517,7 +600,7 @@ public class Client {
 
     //send a message to the output stream
     private static void sendMessage(byte[] msg, int socketIndex)
-    {
+    {   
         try {
             //stream write the message
             out[socketIndex].writeObject(msg);
@@ -530,7 +613,7 @@ public class Client {
     }
 
     private static void initializeFilePieces(boolean hasFile) {
-    	filePieces = new byte[(fileSize/pieceSize)+1][pieceSize];
+    	filePieces = new byte[numberOfBits][pieceSize];
 
     	if (!hasFile)
     		return;
