@@ -30,7 +30,7 @@ public class Message {
 	public int clientID = -1;//-1 means that this value has not been set
 	public byte type;
 	public byte[] lengthB;
-	public byte[] payload;
+	public static byte[] payload;
 
 	public Message(){}
 
@@ -45,6 +45,7 @@ public class Message {
 		this.type = type;
 
 		if (hasPayload((int)type)) {
+			this.payload = new byte[length];
 			this.payload = payload;
 		}
 		else {

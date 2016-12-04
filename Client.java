@@ -37,6 +37,7 @@ public class Client {
     public static byte[] bitfield;
     public static int numberOfBits;
     public static int numberOfBytes;
+    public static boolean allPeersHaveFile; 
 
     static ServerListener serverListener;
     static int totalPieces = 0;
@@ -136,7 +137,6 @@ public class Client {
             //Starts our server listener which will create multiple sockets based on how many clients connect
             serverListener = new ServerListener(peerIds[ownIndex], neighbors[ownIndex].hostName, neighbors[ownIndex].portNumber);
 
-
             //This checks for connections to the other clients
             initConnections();
 
@@ -151,7 +151,7 @@ public class Client {
             }
             int iteration = 0;
             //Main loop that checks if we need to send or receive messages
-            while (true) {
+            while (!allPeersHaveFile) {
 
             	//Send Message Test
 	           	/*if (iteration++ == 1) {
@@ -160,7 +160,6 @@ public class Client {
             			sendRequest(((ownIndex+1)%2), 0);
         			}
             	}*/
-
 
             //This is where we check to see if we need to send any messages:
             for (int i = 0; i < peerIds.length; i++) {
@@ -190,10 +189,10 @@ public class Client {
                         int requestedPieceNumber = getRandomPiece(neighbors[i]);
                         neighbors[i].pieceNumber = requestedPieceNumber;
 
-                        System.out.println("Requesting piece: " + requestedPieceNumber);
                         //Call the method to send the request:
-                        if (requestedPieceNumber != -1)
+                        if (requestedPieceNumber != -1) {
                             sendRequest(i, requestedPieceNumber);
+                        }
                     }
                 }
             }
@@ -317,10 +316,37 @@ public class Client {
 	                    	ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
                             BigInteger tempField = new BigInteger(neighbors[messageIndex].bitmap);
+
                             int thisIndex = buffer.getInt();
-                            tempField.setBit(thisIndex); //update with sent 'have' index
+
+                            tempField = tempField.setBit(thisIndex); //update with sent 'have' index                          
+
                             neighbors[messageIndex].bitmap = tempField.toByteArray();
 
+                            //Check if neighbor now has the file
+                            boolean neighborHasFile = true;
+                            for (int i = 0; i < numberOfBits; i++) {
+                                if (!tempField.testBit(i)) {
+                                    neighborHasFile = false;
+                                    break;
+                                }
+                            }
+
+                            for (byte b : neighbors[messageIndex].bitmap) {
+                                System.out.println(Integer.toBinaryString(b & 255 | 256).substring(1));
+                            }
+
+                            hasFile[messageIndex] = neighborHasFile;
+                            //Check if all peers now have the file
+                            boolean temp = true;
+                            for (int i = 0; i < peerIds.length; i++) {
+                                if (!hasFile[i]) {
+                                    temp = false;
+                                    break;
+                                }
+                            }
+
+                            allPeersHaveFile = temp;
 
 	                    	logger.info("Peer " + peerIds[ownIndex] + " received the 'have' message from " + neighbors[messageIndex].peerId +
 	                    		" for the piece " + thisIndex + "." +'\n');
@@ -339,17 +365,28 @@ public class Client {
 
                             neighbors[messageIndex].waitingForPiece = false;
 
-
-
 	                    	BigInteger tempField = new BigInteger(bitfield);
 
 	                    	tempField = tempField.setBit(neighbors[messageIndex].pieceNumber); //update with most recently requested number
+                            
 	                    	bitfield = tempField.toByteArray();
 
                             dataReceived[messageIndex] += pieceSize;
 
 	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + neighbors[messageIndex].pieceNumber
-	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n' + incomingMessage.payload.length);
+	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + ".");
+
+                            //Check to see if we have the file now
+                            boolean haveFile = true;
+                            for (int i = 0; i < numberOfBits; i++) {
+                                if (!tempField.testBit(i)) {
+                                    haveFile = false;
+                                    break;
+                                } 
+                            }
+
+                            hasFile[ownIndex] = haveFile;
+                            
 
 	                    	for (int i = 0; i < peerIds.length; i++) {
 	                    		if (i == ownIndex)
@@ -372,8 +409,20 @@ public class Client {
                                     sendNotInterested(i);
                             }
 
-	                    	break;
-	                    }
+
+                                //Check if all peers now have the file
+                                boolean temp = true;
+                                for (int i = 0; i < peerIds.length; i++) {
+                                    if (!hasFile[i]) {
+                                        temp = false;
+                                        break;
+                                    }
+                                }
+
+                                allPeersHaveFile = temp;    
+    
+	                           break;
+	                       }
 
                         case Message.request:
                         {
@@ -382,7 +431,6 @@ public class Client {
                             //If they are choked
                             //if (!neighbors[messageIndex].choked)    //Uncomment to run legit m,m.
                             int pieceNumber = buffer.getInt();
-                            System.out.println("Sending File Piece :" + pieceNumber);
                             sendFilePiece(messageIndex, pieceNumber);
                             break;
                         }
@@ -415,9 +463,8 @@ public class Client {
                     serverListener.receivedMessages.remove(m);
                 }
 	        }
-
 	    }
-}
+    }
         catch (ConnectException e) {
             System.err.println("Connection refused. You need to initiate a server first.");
         }
@@ -448,6 +495,7 @@ public class Client {
                 ioException.printStackTrace();
             }
         }
+        System.exit(0);
     }
 
     private static void sendHandshake(int index) {
@@ -504,7 +552,7 @@ public class Client {
 
 		logger.info("Sending have " + pieceNumber + " to server " + index + '\n');
 
-    	sendMessage(message.getMessageBytes(), index);
+        sendMessage(message.getMessageBytes(), index);
     }
 
    	private static void sendFilePiece(int index, int pieceNumber) {

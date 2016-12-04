@@ -11,7 +11,7 @@ import java.util.*;
 
 public class ServerListener {
 
-    public static final List<Message> receivedMessages = Collections.synchronizedList(new ArrayList<Message>()); //Synchronized list of messages received which is thread safe
+    public List<Message> receivedMessages; //Synchronized list of messages received which is thread safe
 
     private int peerId;
     private String hostName;
@@ -32,6 +32,7 @@ public class ServerListener {
         //Init listener:
         listener = null;
         //Init message list:
+        receivedMessages = Collections.synchronizedList(new ArrayList<Message>());
         new ListenerThread().start();
     }
 
@@ -81,10 +82,7 @@ public class ServerListener {
 
         //Converts the incoming bytes into the actual Message with its associated clientID
         int length = ByteBuffer.allocate(4).put(Arrays.copyOfRange(data, 0, 4)).getInt(0);
-        byte[] payload = null;
-        if (length > 0)
-            payload = Arrays.copyOfRange(data, 5, data.length);
-
+        byte[] payload = Arrays.copyOfRange(data, 5, data.length);
         return new Message(length, data[4], payload, clientID);
     }
 
@@ -113,15 +111,13 @@ public class ServerListener {
                     while(true)
                     {
                         //receive the message sent from the client
-                        byte[] src = (byte[])in.readObject();
+                        byte[] temp = (byte[])in.readObject();
                         /*for (int i = 0; i < temp.length; i++) {
                             System.out.println(i + " : " + temp[i]);
                         }*/
-                        byte[] temp = Arrays.copyOf(src, src.length);
                         message = convertToMessage(temp, clientID);
                         //System.out.println("Placing message in array: " + message.toString());
 
-                        
 
                         //Add the message to our list (Synchronized makes it thread safe):
                         synchronized (receivedMessages) {
