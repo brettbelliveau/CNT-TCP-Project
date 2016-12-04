@@ -63,11 +63,11 @@ public class Client {
 
         //Set up for local logging (this process)
             prepareLogging();
-        
+
 
         if (fileSize%pieceSize != 0)
             numberOfBits = (int)(fileSize/pieceSize + 1);
-        else 
+        else
             numberOfBits = (int)(fileSize/pieceSize);
 
         if (numberOfBits % 8 != 0)
@@ -248,7 +248,7 @@ public class Client {
                             continue;
                         }
                     }
-                    
+
                    //Using a switch statement base on which type this message is:
                    	switch ((int)incomingMessage.type) {
                     	case Message.handshake:
@@ -339,7 +339,7 @@ public class Client {
 
                             neighbors[messageIndex].waitingForPiece = false;
 
-                            
+
 
 	                    	BigInteger tempField = new BigInteger(bitfield);
 
@@ -368,7 +368,7 @@ public class Client {
                                 boolean interested = checkIfNeedPieces(neighbors[i]);
 
                                 //If there is no piece, send uninterested
-                                if (!interested) 
+                                if (!interested)
                                     sendNotInterested(i);
                             }
 
@@ -568,7 +568,7 @@ public class Client {
         BigInteger selfBitfieldInt = new BigInteger(bitfield);
 
         BigInteger interestingBits = incomingBitfieldInt.and(selfBitfieldInt.and(incomingBitfieldInt).not());
-        
+
         int[] values = new int[interestingBits.bitLength()];
         int j = 0;
         boolean exists = false;
@@ -640,7 +640,7 @@ public class Client {
 
     //send a message to the output stream
     private static void sendMessage(byte[] msg, int socketIndex)
-    {   
+    {
         try {
             //stream write the message
             out[socketIndex].writeObject(msg);
@@ -698,6 +698,7 @@ public class Client {
     //Calculate how much data was sent in the past unchoking interval... probably have to determine
     //how many pieces were sent and divide it by the unchoking interval (then sort?)
     public static double calculateDownloadRate(int peer) {
+      //System.out.println("Calculate download rate: peer, madeConnection, interested, ownIndex: " + neighbors[peer].madeConnection + "," + neighbors[peer].interested);
       if (neighbors[peer].madeConnection && neighbors[peer].interested && peer != ownIndex) { //Check if connection was made and peer is interested
         //Calculate download rate
         int val = dataReceived[peer]/PeerProcess.unchokingInterval;
@@ -723,8 +724,8 @@ public class Client {
     		  downloads[i] = calculateDownloadRate(i); //Calculate download rate for all neighbors
         }
 
-       System.out.println("Neighbor peer IDs: " + Arrays.toString(peerIds));
-       System.out.println("Download rates: " + Arrays.toString(downloads));
+       //System.out.println("Total neighbors: " + neighbors.length);
+       //System.out.println("Download rates: " + Arrays.toString(downloads));
        System.arraycopy(downloads, 0, temp, 0, downloads.length); //Copy the download rates to the temp array
        Arrays.sort(temp); //Sorts in ascending order, reversed below
        for (int i = 0; i < temp.length / 2; i++) {
@@ -752,8 +753,8 @@ public class Client {
       }
 
       for (int i = 0; i < preferredNeighbors.length; i++) { //Fill the preferredNeighbors array with proper indices
-        for(int j = 0; j < downloads.length; i++) {
-          if ((startIndex == 0 || i < startIndex) && topRates[i] == downloads[j]) { //If there wasn't a tie that didn't fit or it hasn't been reached yet
+        for(int j = 0; j < downloads.length; j++) {
+          if ((startIndex == 0 || i < startIndex) && (topRates[i] == downloads[j]) && !chosen[j]) { //If there wasn't a tie that didn't fit or it hasn't been reached yet
             preferredNeighbors[i] = j; //And this value is the correct one, take the index of downloads[]
             chosen[j] = true; //Mark as chosen
             break;
@@ -771,13 +772,14 @@ public class Client {
         }
       }
      //}
-     System.out.println("Highest download rate peers: " + Arrays.toString(preferredNeighbors));
+     //System.out.println("Highest download rate peers: " + Arrays.toString(preferredNeighbors));
 
      boolean found = false; //Determine whether to send choke or unchoke message
-     for (int i = 0; i < neighbors.length; i++) { //Loop through all neighbors
-      for (int j = 0; j < preferredNeighbors.length; j++) { //Check if neighbor i is preferred or optimistically unchoked
-       if(neighbors[i].peerId == preferredNeighbors[j]) {
+     for (int i = 0; i < preferredNeighbors.length; i++) { //Loop through all neighbors
+      for (int j = 0; j < neighbors.length; j++) { //Check if neighbor i is preferred or optimistically unchoked
+       if(preferredNeighbors[i] == j) {
         found = true; //If so, mark true
+        break;
        }
      }
      if (i != ownIndex) {
