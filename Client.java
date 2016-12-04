@@ -332,10 +332,6 @@ public class Client {
                                 }
                             }
 
-                            for (byte b : neighbors[messageIndex].bitmap) {
-                                System.out.println(Integer.toBinaryString(b & 255 | 256).substring(1));
-                            }
-
                             hasFile[messageIndex] = neighborHasFile;
                             //Check if all peers now have the file
                             boolean temp = true;
@@ -566,7 +562,6 @@ public class Client {
     private static void sendChoke(int index) {
       //Send a choke message to non-preferred peers
       Message message = new Message(0,(byte)Message.choke, null);
-      System.out.println("Sending choke to index " + index);
 
       sendMessage(message.getMessageBytes(), index);
     }
@@ -574,7 +569,6 @@ public class Client {
     private static void sendUnchoke(int index) {
       //Send a choke message to non-preferred peers
       Message message = new Message(0,(byte)Message.unchoke, null);
-      System.out.println("Sending unchoke to index " + index);
 
       sendMessage(message.getMessageBytes(), index);
     }
@@ -626,7 +620,7 @@ public class Client {
                 values[j++] = i;
                 exists = true;
 
-                System.out.println("Has bit: " + i);
+//                System.out.println("Has bit: " + i);
             }
         }
 
