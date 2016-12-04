@@ -19,6 +19,8 @@ public class Neighbor {
     public boolean hasBitfieldReceived = false;
     public boolean hasHandshakeSent = false;
     public boolean hasBitfieldSent = false;
+    public boolean waitingForPiece = false;
+    public int pieceNumber = -1;
 
     public Neighbor() {
         

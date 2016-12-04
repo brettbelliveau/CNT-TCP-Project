@@ -31,7 +31,6 @@ public class Client {
     static FileHandler fileHandler;
     static byte[][] filePieces;
     static String fileName;
-	  static int requestedPieceNumber = 5; //TODO: initialize this in the sendRequest()
     static int[] clientIDToPeerID; // Holds the conversion for converting a client ID to peer ids
 
     public static Neighbor[] neighbors;
@@ -155,12 +154,12 @@ public class Client {
             while (true) {
 
             	//Send Message Test
-	           	if (iteration++ == 1) {
+	           	/*if (iteration++ == 1) {
             		try{ Thread.sleep(1000); } catch(Exception e){}
             		if (hasFile[ownIndex]) {
             			sendRequest(((ownIndex+1)%2), 0);
         			}
-            	}
+            	}*/
 
 
             //This is where we check to see if we need to send any messages:
@@ -180,25 +179,41 @@ public class Client {
                         neighbors[i].hasBitfieldSent = true;
                         logger.info("Sent bitfield to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber + '\n');
                     }
+
+                    //Request a piece at random if we are able to:
+                    if (neighbors[i].hasBitfieldReceived &&
+                        neighbors[i].hasHandshakeReceived &&
+                        neighbors[i].choked == false &&
+                        neighbors[i].waitingForPiece == false) {
+
+                        neighbors[i].waitingForPiece = true;
+                        int requestedPieceNumber = getRandomPiece(neighbors[i]);
+                        neighbors[i].pieceNumber = requestedPieceNumber;
+
+                        System.out.println("Requesting piece: " + requestedPieceNumber);
+                        //Call the method to send the request:
+                        if (requestedPieceNumber != -1)
+                            sendRequest(i, requestedPieceNumber);
+                    }
                 }
             }
 
 
-            // if (iteration++ == 1) {
-            //   timer1.scheduleAtFixedRate(new TimerTask() {
-            //      @Override
-            //       public void run(){
-            //          determinePreferredNeighbors();
-            //       }
-            //      },0, PeerProcess.unchokingInterval * 1000);
+            if (iteration++ == 1) {
+              timer1.scheduleAtFixedRate(new TimerTask() {
+                 @Override
+                  public void run(){
+                     determinePreferredNeighbors();
+                  }
+                 },0, PeerProcess.unchokingInterval * 1000);
 
-            //    timer2.scheduleAtFixedRate(new TimerTask() {
-            //      @Override
-            //       public void run(){
-            //          determineOptimisticNeighbor();
-            //       }
-            //     },0, PeerProcess.optimisticUnchokingInterval * 1000);
-            // }
+               timer2.scheduleAtFixedRate(new TimerTask() {
+                 @Override
+                  public void run(){
+                     determineOptimisticNeighbor();
+                  }
+                },0, PeerProcess.optimisticUnchokingInterval * 1000);
+            }
 
             //Trying to fix messages:
             List<Message> messagesToRemove = new ArrayList<Message>();
@@ -209,9 +224,9 @@ public class Client {
                 Iterator iter = serverListener.receivedMessages.iterator();
                 while (iter.hasNext()) {
                     Message incomingMessage = (Message)iter.next();
-                    System.out.println("Client LOOP:" + incomingMessage.toString());
+                    //System.out.println("Client LOOP:" + incomingMessage.toString());
                     //This gets the peerID of the incoming message, we have to do it like this because
-                   //this server has to know which client the message is coming from, and it's inside the message.
+                    //this server has to know which client the message is coming from, and it's inside the message.
                     int messageIndex = clientIDToPeerID[incomingMessage.clientID];
 
                     if (messageIndex == -1 && !((int)incomingMessage.type == Message.handshake)) {
@@ -228,10 +243,10 @@ public class Client {
 	                   	}
                     }
                     if (messageIndex != -1) {
-                    if (((int)incomingMessage.type != Message.bitfield) && neighbors[messageIndex].hasBitfieldReceived == false && neighbors[messageIndex].hasHandshakeReceived == true) {
-                        //Only listen for bitfields until we have it
-                        continue;
-                    }
+                        if (((int)incomingMessage.type != Message.bitfield) && neighbors[messageIndex].hasBitfieldReceived == false && neighbors[messageIndex].hasHandshakeReceived == true) {
+                            //Only listen for bitfields until we have it
+                            continue;
+                        }
                     }
                     
                    //Using a switch statement base on which type this message is:
@@ -296,9 +311,9 @@ public class Client {
 
 	                    case Message.have:
 	                    {
-							for (byte b : incomingMessage.payload) {
+							/*for (byte b : incomingMessage.payload) {
             				    System.out.println(Integer.toBinaryString(b & 255 | 256).substring(1));
-            				}
+            				}*/
 	                    	ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
 
                             BigInteger tempField = new BigInteger(neighbors[messageIndex].bitmap);
@@ -320,48 +335,29 @@ public class Client {
 	                    //Message type is file piece
 	                    case Message.piece:
 	                    {
-	                    	filePieces[requestedPieceNumber] = incomingMessage.payload;
+	                    	filePieces[neighbors[messageIndex].pieceNumber] = incomingMessage.payload;
+
+                            neighbors[messageIndex].waitingForPiece = false;
+
+                            
 
 	                    	BigInteger tempField = new BigInteger(bitfield);
-	                    	tempField.setBit(requestedPieceNumber); //update with most recently requested number
+
+	                    	tempField = tempField.setBit(neighbors[messageIndex].pieceNumber); //update with most recently requested number
 	                    	bitfield = tempField.toByteArray();
 
                             dataReceived[messageIndex] += pieceSize;
 
-	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + requestedPieceNumber
-	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n');
+	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + neighbors[messageIndex].pieceNumber
+	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n' + incomingMessage.payload.length);
 
 	                    	for (int i = 0; i < peerIds.length; i++) {
 	                    		if (i == ownIndex)
 	                    			continue;
-	                			sendHave(i, requestedPieceNumber);
+	                			sendHave(i, neighbors[messageIndex].pieceNumber);
 	                    	}
 
-                            requestedPieceNumber = -1;
-
-                            BigInteger ownField = new BigInteger(bitfield);
-                            BigInteger neighborField = new BigInteger(neighbors[messageIndex].bitmap);
-                            List<Integer> interestingPieces = new ArrayList<Integer>();
-
-                            for (int i = 0; i < bitfield.length; i++) {
-                                if (neighborField.testBit(i)
-                                    && !ownField.testBit(i))
-                                    interestingPieces.add(i);
-                            }
-
-                            Integer[] interestingPiecesArray = new Integer[interestingPieces.size()];
-
-                            interestingPieces.toArray(interestingPiecesArray);
-
-                            if (interestingPieces.size() > 0) {
-                                requestedPieceNumber = rng.nextInt(interestingPiecesArray.length);
-								sendRequest(messageIndex, requestedPieceNumber);
-                            }
-
-                            else {
-                                requestedPieceNumber = -1;
-                            }
-
+                            neighbors[messageIndex].pieceNumber = -1;
                             //Check to see if not interested should be sent
                             //For each neighbor
                             for (int i = 0; i < neighbors.length; i++) {
@@ -382,9 +378,12 @@ public class Client {
                         case Message.request:
                         {
                             ByteBuffer buffer = ByteBuffer.wrap(incomingMessage.payload);
-
-                            if (true/*!neighbors[messageIndex].choked*/)    //Uncomment to run legit m,m.
-                              sendFilePiece(messageIndex, buffer.getInt());
+                            //I don't think we need an if statement here, they shouldnt be sending
+                            //If they are choked
+                            //if (!neighbors[messageIndex].choked)    //Uncomment to run legit m,m.
+                            int pieceNumber = buffer.getInt();
+                            System.out.println("Sending File Piece :" + pieceNumber);
+                            sendFilePiece(messageIndex, pieceNumber);
                             break;
                         }
 
@@ -562,6 +561,32 @@ public class Client {
             return true;
         }
         return false;
+    }
+
+    private static int getRandomPiece(Neighbor neighbor) {
+        BigInteger incomingBitfieldInt = new BigInteger(neighbor.bitmap);
+        BigInteger selfBitfieldInt = new BigInteger(bitfield);
+
+        BigInteger interestingBits = incomingBitfieldInt.and(selfBitfieldInt.and(incomingBitfieldInt).not());
+        
+        int[] values = new int[interestingBits.bitLength()];
+        int j = 0;
+        boolean exists = false;
+        for (int i = 0; i < interestingBits.bitLength(); i++) {
+            if (interestingBits.testBit(i)) {
+                values[j++] = i;
+                exists = true;
+
+                System.out.println("Has bit: " + i);
+            }
+        }
+
+        //Choose a random value from the available bits
+        if (exists) {
+            return values[rng.nextInt(j)];
+        } else {
+            return -1;
+        }
     }
 
     private static void initConnections() {
@@ -768,12 +793,21 @@ public class Client {
 
 
     public static void determineOptimisticNeighbor() {
-    boolean badNeighbor = true;
-    while(badNeighbor) {
-      optimisticNeighbor = rng.nextInt(neighbors.length);
-      if(optimisticNeighbor != ownIndex)
-        badNeighbor = false;
+        boolean badNeighbor = true;
+
+        //Calculate from the available interested neighbors
+        int[] values = new int[neighbors.length];
+        int j = 0;
+        boolean exists = false;
+        for (int i = 0; i < neighbors.length; i++) {
+            if (neighbors[i].interested) {
+                values[j++] = i;
+                exists = true;
+            }
+        }
+        //Choose a random neighbor from the list
+        if (exists) {
+            sendUnchoke(values[rng.nextInt(j)]);
+        }
     }
-     sendUnchoke(optimisticNeighbor);
-   }
 }
