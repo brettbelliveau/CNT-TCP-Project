@@ -206,9 +206,9 @@ public class Client {
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
 				//logger.info("Size: " + serverListener.receivedMessages.size());
-
-                for (int j = 0; j < serverListener.receivedMessages.size(); j++) {
-                    Message incomingMessage = (Message)serverListener.receivedMessages.get(j);
+                Iterator iter = serverListener.receivedMessages.iterator();
+                while (iter.hasNext()) {
+                    Message incomingMessage = (Message)iter.next();
                     System.out.println("Client LOOP:" + incomingMessage.toString());
                     //This gets the peerID of the incoming message, we have to do it like this because
                    //this server has to know which client the message is coming from, and it's inside the message.
@@ -226,6 +226,12 @@ public class Client {
 	                       			break;
 	               			}
 	                   	}
+                    }
+                    if (messageIndex != -1) {
+                    if (((int)incomingMessage.type != Message.bitfield) && neighbors[messageIndex].hasBitfieldReceived == false && neighbors[messageIndex].hasHandshakeReceived == true) {
+                        //Only listen for bitfields until we have it
+                        continue;
+                    }
                     }
                     
                    //Using a switch statement base on which type this message is:
@@ -403,7 +409,7 @@ public class Client {
 	                     break;
 	                }
 	                //After we have parsed this message we are done with it, remove it:
-	                messagesToRemove.add(serverListener.receivedMessages.get(j));
+	                messagesToRemove.add(incomingMessage);
                 }
 
                 for (Message m : messagesToRemove) {
