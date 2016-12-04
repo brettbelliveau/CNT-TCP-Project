@@ -495,6 +495,7 @@ public class Client {
                 ioException.printStackTrace();
             }
         }
+        assembleFilePieces();
         System.exit(0);
     }
 
@@ -708,7 +709,7 @@ public class Client {
 
     	try {
     	 	File file = new File(fileName);
-    	 	FileInputStream inputStream = new FileInputStream(file);
+    	 	FileInputStream inputStream = new FileInputStream("peer_" + peerId + "\\" + file);
 
             int currentPieceSize, currentPieceIndex;
             currentPieceIndex = currentPieceSize = 0;
@@ -717,7 +718,8 @@ public class Client {
             	currentPieceSize = inputStream.read(filePieces[currentPieceIndex++]);
             }
         } catch (Exception e) {
-        	logger.info("Error generating file pieces:");
+        	logger.info("Error generating file pieces");
+            System.exit(0);
         }
 
         //for (int i = 0; i < filePieces.length; i++) {
@@ -732,7 +734,7 @@ public class Client {
         try {
             String workingDir = System.getProperty("user.dir");
 
-            fileHandler = new FileHandler(workingDir + "\\" + "log_peer_" + peerId + ".log");
+            fileHandler = new FileHandler(workingDir + "\\" + "peer_" + peerId + "\\" + "log_peer_" + peerId + ".log");
             logger.addHandler(fileHandler);
 
             SimpleFormatter formatter = new SimpleFormatter();
@@ -860,4 +862,26 @@ public class Client {
             sendUnchoke(values[rng.nextInt(j)]);
         }
     }
+
+    private static void assembleFilePieces() {
+        byte[] allPieces = new byte[fileSize];
+
+        for (int i = 0; i < numberOfBits; i++)
+            System.arraycopy(filePieces[i], 0, allPieces, 0, filePieces[i].length);
+
+        try {
+            FileOutputStream os = new FileOutputStream("peer_" + peerId + "\\" + fileName);
+            os.write(allPieces);
+            os.close();
+        } catch (Exception e) {
+            logger.info("Error assembling file pieces");
+            System.exit(0);
+        }
+
+        //for (int i = 0; i < filePieces.length; i++) {
+        //  System.out.println(i);
+        //  logger.info("Bytes:" + Arrays.toString(filePieces[i]));
+        //}
+    }
+
 }
