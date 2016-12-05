@@ -140,8 +140,8 @@ public class Client {
             //This checks for connections to the other clients
             initConnections();
 
-            logger.info("All connections have been established.");
-            logger.info("" + '\n');
+            //logger.info("All connections have been established.");
+            //logger.info("" + '\n');
             //initialize outputStreams
             for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex && neighbors[i].madeConnection) {
@@ -348,7 +348,8 @@ public class Client {
 	                    		" for the piece " + thisIndex + "." +'\n');
 
                             //Determine if interested
-	                        if (bitfield[messageIndex] == 0)
+	                        BigInteger myField = new BigInteger(bitfield);
+                            if (!myField.testBit(thisIndex))
                                 sendInterested(messageIndex);
 
                             break;
