@@ -398,8 +398,11 @@ public class Client {
                                 if (i == ownIndex)
                                     continue;
 
-                                //Check if there is a piece it has that we do not have
-                                boolean interested = checkIfNeedPieces(neighbors[i]);
+                                boolean interested = false;
+
+                                //Check if there is a piece it has that we do not have (of connected peers)
+                                if (neighbors[i].bitmap != null)
+                                    interested = checkIfNeedPieces(neighbors[i]);
 
                                 //If there is no piece, send uninterested
                                 if (!interested)
