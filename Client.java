@@ -675,7 +675,7 @@ public class Client {
                 //Wait four seconds before attempting to reconnect
                     try {
                     System.out.println("Waiting to reconnect..");
-                    Thread.sleep(3000);
+                    Thread.sleep(1000);
                     } catch (Exception e) {
 
                     }
@@ -868,14 +868,17 @@ public class Client {
     }
 
     private static void assembleFilePieces() {
-        byte[] allPieces = new byte[fileSize];
 
-        for (int i = 0; i < numberOfBits; i++)
-            System.arraycopy(filePieces[i], 0, allPieces, 0, filePieces[i].length);
+        byte[] empty = new byte[pieceSize];
 
         try {
             FileOutputStream os = new FileOutputStream("peer_" + peerId + "\\" + fileName);
-            os.write(allPieces);
+
+            for (int i = 0; i < numberOfBits; i++) {
+                if (filePieces[i] != empty)
+                os.write(filePieces[i]);
+            }
+
             os.close();
         } catch (Exception e) {
             logger.info("Error assembling file pieces");
