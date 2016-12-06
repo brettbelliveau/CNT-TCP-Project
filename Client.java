@@ -582,7 +582,7 @@ public class Client {
         byte[] pieceIndex = ByteBuffer.allocate(4).putInt(pieceNumber).array();
         Message message = new Message(4,(byte)Message.request,pieceIndex);
 
-        logger.info("Sending request " + pieceNumber + " to server " + index + '\n');
+        //logger.info("Sending request " + pieceNumber + " to server " + index + '\n');
 
         sendMessage(message.getMessageBytes(), index);
 
@@ -736,7 +736,7 @@ public class Client {
             "%1$tF %1$tT: %5$s%6$s%n");
 
             SimpleFormatter formatter = new SimpleFormatter();
-            fileHandler = new FileHandler(workingDir + "\\" + "peer_" + peerId + "\\" + "log_peer_" + peerId + ".log");
+            fileHandler = new FileHandler(workingDir + "//" + "peer_" + peerId + "//" + "log_peer_" + peerId + ".log");
             
             fileHandler.setFormatter(formatter);
             logger.addHandler(fileHandler);

@@ -174,7 +174,7 @@ public class PeerProcess {
 		String workingDir = System.getProperty("user.dir");
 		File file;
 		for (int peerId : peerIds) {
-			file = new File (workingDir + "\\" + "peer_" + peerId);
+			file = new File (workingDir + "//" + "peer_" + peerId);
 			if (!file.isDirectory()) {
 				file.mkdir();
 			}
