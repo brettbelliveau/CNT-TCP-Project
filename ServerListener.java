@@ -39,7 +39,7 @@ public class ServerListener {
     private class ListenerThread extends Thread {
 
     	public void run() {
-            System.out.println("The server is running waiting for connections." + '\n');
+            //System.out.println("The server is running waiting for connections." + '\n');
             int clientNum = 0;
             ServerSocket listener = null;
             try {
@@ -47,7 +47,7 @@ public class ServerListener {
                     try {
                         listener = new ServerSocket(portNumber);
                         new Handler(listener.accept(),clientNum).start();
-                        System.out.println("Client "  + clientNum + " is connected!");
+                        //System.out.println("Client "  + clientNum + " is connected!");
                         clientNum++;
                     } catch (SocketException e) {
                         Thread.sleep(50);
@@ -124,7 +124,7 @@ public class ServerListener {
                             receivedMessages.add(message);
                         }
                         //show the message to the user
-                        System.out.println("Received message: " + message.toString() + " from client " + clientID);
+                        //System.out.println("Received message: " + message.toString() + " from client " + clientID);
                         /*
                          *
                          * TODO: Add this to the logger somehow
@@ -137,7 +137,7 @@ public class ServerListener {
                 }
             }
             catch(IOException ioException){
-                System.out.println("Disconnect with Client " + clientID);
+                //System.out.println("Disconnect with Client " + clientID);
             }
             finally{
                 //Close connections
@@ -146,7 +146,7 @@ public class ServerListener {
                     connection.close();
                 }
                 catch(IOException ioException){
-                    System.out.println("Disconnect with Client " + clientID);
+                    //System.out.println("Disconnect with Client " + clientID);
                 }
             }
         }

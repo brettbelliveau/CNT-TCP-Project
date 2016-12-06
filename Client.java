@@ -63,7 +63,7 @@ public class Client {
         //Which floors the value
 
         //Set up for local logging (this process)
-            prepareLogging();
+        prepareLogging();
 
 
         if (fileSize%pieceSize != 0)
@@ -153,14 +153,6 @@ public class Client {
             //Main loop that checks if we need to send or receive messages
             while (!allPeersHaveFile) {
 
-            	//Send Message Test
-	           	/*if (iteration++ == 1) {
-            		try{ Thread.sleep(1000); } catch(Exception e){}
-            		if (hasFile[ownIndex]) {
-            			sendRequest(((ownIndex+1)%2), 0);
-        			}
-            	}*/
-
             //This is where we check to see if we need to send any messages:
             for (int i = 0; i < peerIds.length; i++) {
                 if (i != ownIndex) {
@@ -169,14 +161,14 @@ public class Client {
                         //Send the bitfield
                         sendHandshake(i);
                         neighbors[i].hasHandshakeSent = true;
-                        logger.info("Sent handshake to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber + '\n');
+                        logger.info("Peer " + peerId + " is connected from Peer " + neighbors[i].peerId + '\n');
                     }
                     //if we havent sent the bitfield and we are connected and we have received the handshake:
                     if (!neighbors[i].hasBitfieldSent && neighbors[i].madeConnection && neighbors[i].hasHandshakeReceived) {
                         //Send the bitfield
                         sendBitfield(i);
                         neighbors[i].hasBitfieldSent = true;
-                        logger.info("Sent bitfield to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber + '\n');
+                        //logger.info("Sent bitfield to host " + neighbors[i].hostName + " on port " + neighbors[i].portNumber + '\n');
                     }
 
                     //Request a piece at random if we are able to:
@@ -209,7 +201,10 @@ public class Client {
                timer2.scheduleAtFixedRate(new TimerTask() {
                  @Override
                   public void run(){
-                     determineOptimisticNeighbor();
+                     int temp = optimisticNeighbor;
+                     optimisticNeighbor = determineOptimisticNeighbor();
+                     if (temp != optimisticNeighbor) 
+                        logger.info("Peer " + peerId + " has the optimistically unchoked neighbor " + optimisticNeighbor + '\n');
                   }
                 },0, PeerProcess.optimisticUnchokingInterval * 1000);
             }
@@ -219,11 +214,11 @@ public class Client {
             //Now check if we have received messages from any clients (Synchronized, thread safe):
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
-				//logger.info("Size: " + serverListener.receivedMessages.size());
+				
                 Iterator iter = serverListener.receivedMessages.iterator();
                 while (iter.hasNext()) {
                     Message incomingMessage = (Message)iter.next();
-                    //System.out.println("Client LOOP:" + incomingMessage.toString());
+                    
                     //This gets the peerID of the incoming message, we have to do it like this because
                     //this server has to know which client the message is coming from, and it's inside the message.
                     int messageIndex = clientIDToPeerID[incomingMessage.clientID];
@@ -264,7 +259,7 @@ public class Client {
 		                   	}
 	                       	//We have received the handshake lets set it and print it out
 	                        neighbors[messageIndex].hasHandshakeReceived = true;
-	                        logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
+	                        //logger.info("Received handshake from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
 	                        break;
 	                    }
 	                    /*
@@ -276,7 +271,7 @@ public class Client {
 	                        neighbors[messageIndex].bitmap = incomingMessage.payload;
 	                        neighbors[messageIndex].hasBitfieldReceived = true;
 
-	                        logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
+	                        //logger.info("Received bitfield from host:" + neighbors[messageIndex].hostName + " on port:" + neighbors[messageIndex].portNumber + '\n');
 	                        //Check to see if we need to send interested or uninterested to the sender
 	                        //As per project requirement
 	                        if (checkIfNeedPieces(neighbors[messageIndex])) {
@@ -371,7 +366,7 @@ public class Client {
                             dataReceived[messageIndex] += pieceSize;
 
 	                    	logger.info("Peer " + peerIds[ownIndex] + " has downloaded the piece " + neighbors[messageIndex].pieceNumber
-	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + ".");
+	                    		+ " from " + neighbors[messageIndex].peerId + ". Now the number of pieces it has is " + (++totalPieces) + "." + '\n');
 
                             //Check to see if we have the file now
                             boolean haveFile = true;
@@ -384,6 +379,8 @@ public class Client {
 
                             hasFile[ownIndex] = haveFile;
                             
+                            if (haveFile)
+                                logger.info("Peer " + peerId + " has downloaded the complete file." + '\n');
 
 	                    	for (int i = 0; i < peerIds.length; i++) {
 	                    		if (i == ownIndex)
@@ -438,14 +435,14 @@ public class Client {
                         case Message.choke:
                         {
                           neighbors[messageIndex].choked = true;
-                          logger.info("Peer " + peerIds[ownIndex] + " received the 'choke' message from " + neighbors[messageIndex].peerId + '\n');
+                          logger.info("Peer " + peerIds[ownIndex] + " is choked by  " + neighbors[messageIndex].peerId + '\n');
                           break;
                         }
 
                         case Message.unchoke:
                         {
                           neighbors[messageIndex].choked = false;
-                          logger.info("Peer " + peerIds[ownIndex] + " received the 'unchoke' message from " + neighbors[messageIndex].peerId + '\n');
+                          logger.info("Peer " + peerIds[ownIndex] + " is unchoked by " + neighbors[messageIndex].peerId + '\n');
                           break;
 
                         }
@@ -466,16 +463,16 @@ public class Client {
 	    }
     }
         catch (ConnectException e) {
-            System.err.println("Connection refused. You need to initiate a server first.");
+            logger.info("Connection refused. You need to initiate a server first.");
         }
         //catch ( ClassNotFoundException e ) {
             //System.err.println("Class not found");
         //}
         catch(UnknownHostException unknownHost) {
-            System.err.println("You are trying to connect to an unknown host!");
+            logger.info("You are trying to connect to an unknown host!");
         }
         catch(IOException ioException) {
-            System.err.print("IOException:");
+            logger.info("IOException: See console for more details.");
             ioException.printStackTrace();
         }
         //catch (InterruptedException e) {
@@ -519,9 +516,10 @@ public class Client {
 
             byte[] handshake = handshakeBuffer.array();
 
-
             sendMessage(handshake, index);
             handshakeBuffer.clear();
+
+            logger.info("Peer " + peerId + " makes a connection to Peer " + neighbors[index].peerId + '\n');
     }
 
     private static void sendBitfield(int index) {
@@ -551,7 +549,7 @@ public class Client {
     	byte[] pieceIndex = ByteBuffer.allocate(4).putInt(pieceNumber).array();
     	Message message = new Message(4,(byte)Message.have,pieceIndex);
 
-		logger.info("Sending have " + pieceNumber + " to server " + index + '\n');
+		//logger.info("Sending have " + pieceNumber + " to server " + index + '\n');
 
         sendMessage(message.getMessageBytes(), index);
     }
@@ -643,16 +641,16 @@ public class Client {
 
                 for (int i = 0; i < peerIds.length; i++) {
                     if (i != ownIndex && !neighbors[i].madeConnection) {
-                        logger.info("Attempting to connect to " + neighbors[i].hostName +
-                            " on port " + neighbors[i].portNumber + '\n');
+                        System.out.println("Attempting to connect to " + neighbors[i].hostName +
+                            " on port " + neighbors[i].portNumber);
 
                         try {
                             //create a socket to connect to the server
                             requestSocket[i] = new Socket(neighbors[i].hostName, neighbors[i].portNumber);
 
                             if (requestSocket[i].isConnected()) {
-                            logger.info("Connected to " + neighbors[i].hostName +
-                                " in port " + neighbors[i].portNumber + '\n');
+                            //logger.info("Connected to " + neighbors[i].hostName +
+                            //    " in port " + neighbors[i].portNumber + '\n');
 
                             connectionsLeft--;
                             neighbors[i].madeConnection = true;
@@ -668,15 +666,15 @@ public class Client {
                 System.out.println();
                 for (int i = 0; i < peerIds.length; i++) {
                     if (neighbors[i].connectionRefused) {
-                        logger.info("Connection refused for " + neighbors[i].hostName +
-                            " on port " + neighbors[i].portNumber + '\n');
+                        //System.out.println("Connection refused for " + neighbors[i].hostName +
+                        //    " on port " + neighbors[i].portNumber + '\n');
 
                     }
                 }
                 if (connectionsLeft > 0) {
                 //Wait four seconds before attempting to reconnect
                     try {
-                    logger.info("Waiting to reconnect.." + '\n');
+                    System.out.println("Waiting to reconnect..");
                     Thread.sleep(3000);
                     } catch (Exception e) {
 
@@ -732,11 +730,15 @@ public class Client {
         try {
             String workingDir = System.getProperty("user.dir");
 
-            fileHandler = new FileHandler(workingDir + "\\" + "peer_" + peerId + "\\" + "log_peer_" + peerId + ".log");
-            logger.addHandler(fileHandler);
+            System.setProperty("java.util.logging.SimpleFormatter.format", 
+            "%1$tF %1$tT: %5$s%6$s%n");
 
             SimpleFormatter formatter = new SimpleFormatter();
+            fileHandler = new FileHandler(workingDir + "\\" + "peer_" + peerId + "\\" + "log_peer_" + peerId + ".log");
+            
             fileHandler.setFormatter(formatter);
+            logger.addHandler(fileHandler);
+
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -822,6 +824,8 @@ public class Client {
      //}
      //System.out.println("Highest download rate peers: " + Arrays.toString(preferredNeighbors));
 
+     logger.info("Peer " + peerId + " has the preferred neighbors " + Arrays.toString(preferredNeighbors) + '\n');
+
      boolean found = false; //Determine whether to send choke or unchoke message
      for (int i = 0; i < preferredNeighbors.length; i++) { //Loop through all neighbors
       for (int j = 0; j < neighbors.length; j++) { //Check if neighbor i is preferred or optimistically unchoked
@@ -842,23 +846,25 @@ public class Client {
    }
 
 
-    public static void determineOptimisticNeighbor() {
+    public static int determineOptimisticNeighbor() {
         boolean badNeighbor = true;
 
         //Calculate from the available interested neighbors
         int[] values = new int[neighbors.length];
         int j = 0;
-        boolean exists = false;
         for (int i = 0; i < neighbors.length; i++) {
             if (neighbors[i].interested) {
                 values[j++] = i;
-                exists = true;
             }
         }
+        int randomNeighbor = 0;
         //Choose a random neighbor from the list
-        if (exists) {
-            sendUnchoke(values[rng.nextInt(j)]);
+        if (j > 0) {
+            randomNeighbor = values[rng.nextInt(j)];
+            sendUnchoke(randomNeighbor);
         }
+
+        return randomNeighbor;
     }
 
     private static void assembleFilePieces() {
@@ -883,3 +889,4 @@ public class Client {
     }
 
 }
+ 
