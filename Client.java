@@ -461,6 +461,8 @@ public class Client {
                 }
 	        }
 	    }
+        //wait for other processes to terminate
+        try { Thread.sleep(1000); } catch (Exception e) {};
     }
         catch (ConnectException e) {
             logger.info("Connection refused. You need to initiate a server first.");
@@ -869,14 +871,14 @@ public class Client {
 
     private static void assembleFilePieces() {
 
-        byte[] empty = new byte[pieceSize];
-
         try {
             FileOutputStream os = new FileOutputStream("peer_" + peerId + "\\" + fileName);
 
             for (int i = 0; i < numberOfBits; i++) {
-                if (filePieces[i] != empty)
-                os.write(filePieces[i]);
+                if (i+1 == numberOfBits) 
+                    os.write(trim(filePieces[i]));
+                else
+                    os.write(filePieces[i]);
             }
 
             os.close();
@@ -889,6 +891,15 @@ public class Client {
         //  System.out.println(i);
         //  logger.info("Bytes:" + Arrays.toString(filePieces[i]));
         //}
+    }
+
+    private static byte[] trim(byte[] data) {
+        int x = data.length-1;
+
+        while (x >= 0 && data[x] == 0)
+            --x;
+
+        return Arrays.copyOf(data, x + 1);
     }
 
 }
