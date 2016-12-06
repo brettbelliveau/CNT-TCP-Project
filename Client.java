@@ -649,7 +649,7 @@ public class Client {
                         try {
                             //create a socket to connect to the server
                             requestSocket[i] = new Socket(neighbors[i].hostName, neighbors[i].portNumber);
-
+		   	    
                             if (requestSocket[i].isConnected()) {
                             //logger.info("Connected to " + neighbors[i].hostName +
                             //    " in port " + neighbors[i].portNumber + '\n');
@@ -707,7 +707,7 @@ public class Client {
 
     	try {
     	 	File file = new File(fileName);
-    	 	FileInputStream inputStream = new FileInputStream("peer_" + peerId + "\\" + file);
+    	 	FileInputStream inputStream = new FileInputStream("peer_" + peerId + "//" + file);
 
             int currentPieceSize, currentPieceIndex;
             currentPieceIndex = currentPieceSize = 0;
@@ -872,7 +872,7 @@ public class Client {
     private static void assembleFilePieces() {
 
         try {
-            FileOutputStream os = new FileOutputStream("peer_" + peerId + "\\" + fileName);
+            FileOutputStream os = new FileOutputStream("peer_" + peerId + "//" + fileName);
 
             for (int i = 0; i < numberOfBits; i++) {
                 if (i+1 == numberOfBits) 
