@@ -37,7 +37,7 @@ public class Client {
     public static byte[] bitfield;
     public static int numberOfBits;
     public static int numberOfBytes;
-    public static boolean allPeersHaveFile; 
+    public static boolean allPeersHaveFile;
 
     static ServerListener serverListener;
     static int totalPieces = 0;
@@ -203,7 +203,7 @@ public class Client {
                   public void run(){
                      int temp = optimisticNeighbor;
                      optimisticNeighbor = determineOptimisticNeighbor();
-                     if (temp != optimisticNeighbor) 
+                     if (temp != optimisticNeighbor)
                         logger.info("Peer " + peerId + " has the optimistically unchoked neighbor " + optimisticNeighbor + '\n');
                   }
                 },0, PeerProcess.optimisticUnchokingInterval * 1000);
@@ -214,11 +214,11 @@ public class Client {
             //Now check if we have received messages from any clients (Synchronized, thread safe):
             synchronized (serverListener.receivedMessages) {
                 //loop thru all of the received messages
-				
+
                 Iterator iter = serverListener.receivedMessages.iterator();
                 while (iter.hasNext()) {
                     Message incomingMessage = (Message)iter.next();
-                    
+
                     //This gets the peerID of the incoming message, we have to do it like this because
                     //this server has to know which client the message is coming from, and it's inside the message.
                     int messageIndex = clientIDToPeerID[incomingMessage.clientID];
@@ -314,7 +314,7 @@ public class Client {
 
                             int thisIndex = buffer.getInt();
 
-                            tempField = tempField.setBit(thisIndex); //update with sent 'have' index                          
+                            tempField = tempField.setBit(thisIndex); //update with sent 'have' index
 
                             neighbors[messageIndex].bitmap = tempField.toByteArray();
 
@@ -360,7 +360,7 @@ public class Client {
 	                    	BigInteger tempField = new BigInteger(bitfield);
 
 	                    	tempField = tempField.setBit(neighbors[messageIndex].pieceNumber); //update with most recently requested number
-                            
+
 	                    	bitfield = tempField.toByteArray();
 
                             dataReceived[messageIndex] += pieceSize;
@@ -374,11 +374,11 @@ public class Client {
                                 if (!tempField.testBit(i)) {
                                     haveFile = false;
                                     break;
-                                } 
+                                }
                             }
 
                             hasFile[ownIndex] = haveFile;
-                            
+
                             if (haveFile)
                                 logger.info("Peer " + peerId + " has downloaded the complete file." + '\n');
 
@@ -416,8 +416,8 @@ public class Client {
                                     }
                                 }
 
-                                allPeersHaveFile = temp;    
-    
+                                allPeersHaveFile = temp;
+
 	                           break;
 	                       }
 
@@ -649,7 +649,7 @@ public class Client {
                         try {
                             //create a socket to connect to the server
                             requestSocket[i] = new Socket(neighbors[i].hostName, neighbors[i].portNumber);
-		   	    
+
                             if (requestSocket[i].isConnected()) {
                             //logger.info("Connected to " + neighbors[i].hostName +
                             //    " in port " + neighbors[i].portNumber + '\n');
@@ -732,12 +732,12 @@ public class Client {
         try {
             String workingDir = System.getProperty("user.dir");
 
-            System.setProperty("java.util.logging.SimpleFormatter.format", 
+            System.setProperty("java.util.logging.SimpleFormatter.format",
             "%1$tF %1$tT: %5$s%6$s%n");
 
             SimpleFormatter formatter = new SimpleFormatter();
             fileHandler = new FileHandler(workingDir + "//" + "peer_" + peerId + "//" + "log_peer_" + peerId + ".log");
-            
+
             fileHandler.setFormatter(formatter);
             logger.addHandler(fileHandler);
 
@@ -776,8 +776,7 @@ public class Client {
     		  downloads[i] = calculateDownloadRate(i); //Calculate download rate for all neighbors
         }
 
-       //System.out.println("Total neighbors: " + neighbors.length);
-       //System.out.println("Download rates: " + Arrays.toString(downloads));
+
        System.arraycopy(downloads, 0, temp, 0, downloads.length); //Copy the download rates to the temp array
        Arrays.sort(temp); //Sorts in ascending order, reversed below
        for (int i = 0; i < temp.length / 2; i++) {
@@ -806,13 +805,13 @@ public class Client {
 
       for (int i = 0; i < preferredNeighbors.length; i++) { //Fill the preferredNeighbors array with proper indices
         for(int j = 0; j < downloads.length; j++) {
-          if ((startIndex == 0 || i < startIndex) && (topRates[i] == downloads[j]) && !chosen[j]) { //If there wasn't a tie that didn't fit or it hasn't been reached yet
+          if ((tieLength == 1 || i < startIndex) && (topRates[i] == downloads[j]) && !chosen[j]) { //If there wasn't a tie that didn't fit or it hasn't been reached yet
             preferredNeighbors[i] = j; //And this value is the correct one, take the index of downloads[]
             chosen[j] = true; //Mark as chosen
             break;
           }
         }
-        if (i >= startIndex && startIndex != 0) { //If there is a tie that doesn't fit and it has been reached
+        if (i >= startIndex && tieLength != 0) { //If there is a tie that doesn't fit and it has been reached
           while(true) { //Randomly probe for a proper value
             randomIndex = rng.nextInt(downloads.length); //Select a random integer in the range [0,downloads.length) (TODO: should probably only search from proper downloads values)
             if(downloads[randomIndex] == topRates[i] && !chosen[randomIndex]) { //If this is the right value and it hasn't been selected yet
@@ -824,7 +823,6 @@ public class Client {
         }
       }
      //}
-     //System.out.println("Highest download rate peers: " + Arrays.toString(preferredNeighbors));
 
      logger.info("Peer " + peerId + " has the preferred neighbors " + Arrays.toString(preferredNeighbors) + '\n');
 
@@ -875,7 +873,7 @@ public class Client {
             FileOutputStream os = new FileOutputStream("peer_" + peerId + "//" + fileName);
 
             for (int i = 0; i < numberOfBits; i++) {
-                if (i+1 == numberOfBits) 
+                if (i+1 == numberOfBits)
                     os.write(trim(filePieces[i]));
                 else
                     os.write(filePieces[i]);
@@ -903,4 +901,3 @@ public class Client {
     }
 
 }
- 
