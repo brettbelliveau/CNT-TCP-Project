@@ -14,7 +14,7 @@ import java.lang.*;
 import java.util.*;
 import java.io.*;
 
-public class PeerProcess {
+public class peerProcess {
 
 	static int peerId;
 

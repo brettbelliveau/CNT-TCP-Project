@@ -125,7 +125,7 @@ public class Client {
         //madeConnection[ownIndex] = true;
         rng = new Random();
         dataReceived = new int[peerIds.length];
-        preferredNeighbors = new int[PeerProcess.numberOfPreferredNeighbors];
+        preferredNeighbors = new int[peerProcess.numberOfPreferredNeighbors];
         timer1 = new Timer();
         timer2 = new Timer();
 
@@ -196,7 +196,7 @@ public class Client {
                   public void run(){
                      determinePreferredNeighbors();
                   }
-                 },0, PeerProcess.unchokingInterval * 1000);
+                 },0, peerProcess.unchokingInterval * 1000);
 
                timer2.scheduleAtFixedRate(new TimerTask() {
                  @Override
@@ -206,7 +206,7 @@ public class Client {
                      if (temp != optimisticNeighbor)
                         logger.info("Peer " + peerId + " has the optimistically unchoked neighbor " + optimisticNeighbor + '\n');
                   }
-                },0, PeerProcess.optimisticUnchokingInterval * 1000);
+                },0, peerProcess.optimisticUnchokingInterval * 1000);
             }
 
             //Trying to fix messages:
@@ -727,7 +727,7 @@ public class Client {
     }
 
     public static void prepareLogging() {
-        logger = Logger.getLogger(PeerProcess.class.getName());
+        logger = Logger.getLogger(peerProcess.class.getName());
 
         try {
             String workingDir = System.getProperty("user.dir");
@@ -753,7 +753,7 @@ public class Client {
       //System.out.println("Calculate download rate: peer, madeConnection, interested, ownIndex: " + neighbors[peer].madeConnection + "," + neighbors[peer].interested);
       if (neighbors[peer].madeConnection && neighbors[peer].interested && peer != ownIndex) { //Check if connection was made and peer is interested
         //Calculate download rate
-        int val = dataReceived[peer]/PeerProcess.unchokingInterval;
+        int val = dataReceived[peer]/peerProcess.unchokingInterval;
         dataReceived[peer] = 0;
         return val;
       }
